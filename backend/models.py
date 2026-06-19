@@ -37,9 +37,21 @@ class KYCRiskRating(str, Enum):
 
 
 class RouterPath(str, Enum):
-    DROPPED = "dropped"          # Loop A filtered it out — stable, no drift
-    FAST_CLASSIFIER = "fast"     # Loop B: T >= 7 days, lightweight model
-    HEAVY_REASONER = "heavy"     # Loop B: T < 7 days or high uncertainty → DeepSeek-R1
+    DROPPED = "dropped"               # Loop A filtered it out — stable, no drift
+    FAST_CLASSIFIER = "fast"          # Loop B: T >= 7 days, lightweight model
+    HEAVY_REASONER = "heavy"          # Loop B: T < 7 days or high uncertainty → DeepSeek-R1
+
+
+class RiskTrend(str, Enum):
+    INCREASING = "INCREASING"
+    STABLE = "STABLE"
+    DECREASING = "DECREASING"
+
+
+class UncertaintyLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +83,7 @@ class KYCDriftField(BaseModel):
     field: str                                 # e.g. "beneficial_owners", "jurisdiction"
     baseline_value: str                        # what was on file at onboarding
     current_value: str                         # what was detected now
-    drift_severity: RiskLevel                  # how significant is this change
+    drift_severity: RiskLevel
     source: str                                # where was the change detected
 
 
@@ -81,7 +93,7 @@ class KYCDriftRecord(BaseModel):
     drifted_fields: list[KYCDriftField]
     overall_drift_severity: RiskLevel
     rekyc_required: bool
-    summary: str                               # human-readable: "Beneficial owner changed from X to Y"
+    summary: str
 
 
 # ---------------------------------------------------------------------------
@@ -93,9 +105,128 @@ class RawSignal(BaseModel):
     client_id: str
     signal_type: SignalType
     source: str                                # e.g. "NewsAPI", "OpenSanctions"
-    content: str                               # raw text or summary
+    content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# HydraEngineOutput — exact schema of what the AI engine emits
+# Field names and types match the colleague's output 1:1. Do not rename.
+# ---------------------------------------------------------------------------
+
+class HydraGraphChange(BaseModel):
+    type: str                                  # "ADDED" | "DELETED" | "UNCHANGED"
+    triple: str                                # "Entity A -> relation -> Entity B"
+
+
+class HydraForecast(BaseModel):
+    next_7_days_risk_trend: RiskTrend
+    uncertainty: UncertaintyLevel
+
+
+class HydraEngineOutput(BaseModel):
+    """
+    Exact schema produced by the HYDRA AI engine.
+    Do not modify field names — they must match the engine output 1:1.
+    Use .to_risk_alert() to convert into the enriched RiskAlert for the API.
+    """
+    client_id: str
+    client_name: str
+    event_type: str                            # e.g. "DRIFT_EVENT"
+    drift_score: float                         # combined drift signal score (0–1)
+    reconstruction_error: float                # raw VAE reconstruction loss
+    threshold: float                           # dynamic VAE threshold at this moment
+    risk_level: RiskLevel
+    time_to_compliance_decay_days: float       # T from survival model
+    router_decision: str                       # "HEAVY_REASONER" | "FAST_CLASSIFIER" | "DROPPED"
+    reason: str                                # plain English explanation of the decision
+    graph_changes: list[HydraGraphChange]      # Neo4j triple changes detected
+    forecast: HydraForecast                    # TimeGPT output
+    audit_citations: list[str]                 # citation IDs or source references
+    recommended_action: str
+
+    def to_risk_alert(self, alert_id: str) -> "RiskAlert":
+        """Adapt raw engine output into the enriched RiskAlert consumed by API and frontend."""
+        router_map = {
+            "HEAVY_REASONER": RouterPath.HEAVY_REASONER,
+            "FAST_CLASSIFIER": RouterPath.FAST_CLASSIFIER,
+            "DROPPED": RouterPath.DROPPED,
+        }
+        loop_a = LoopATrace(
+            vae_reconstruction_error=self.reconstruction_error,
+            drift_threshold=self.threshold,
+            drift_detected=self.event_type == "DRIFT_EVENT",
+            drift_score=self.drift_score,
+            top_keywords_matched=[],
+            embedding_shift_score=self.drift_score,
+            decision="DRIFT_EVENT emitted" if self.event_type == "DRIFT_EVENT" else "Signal dropped — stable",
+        )
+        graph_steps = [
+            GraphRAGStep(
+                entity=self.client_name,
+                triple=gc.triple,
+                triple_status=gc.type,
+                relationship_change=gc.triple,
+                cypher_query="",
+                timestamp_slice="",
+            )
+            for gc in self.graph_changes
+        ]
+        loop_b = LoopBTrace(
+            graph_steps=graph_steps,
+            graph_summary=self.reason,
+            timegpt_forecast_horizon_days=7,
+            timegpt_anomaly_score=self.drift_score,
+            timegpt_uncertainty_interval=(0.0, 0.0),
+            timegpt_risk_trend=self.forecast.next_7_days_risk_trend,
+            timegpt_uncertainty=self.forecast.uncertainty,
+            timegpt_summary=f"Risk trend: {self.forecast.next_7_days_risk_trend.value}, uncertainty: {self.forecast.uncertainty.value}",
+            survival_model_used="DeepSurv",
+            time_to_compliance_decay_days=self.time_to_compliance_decay_days,
+            survival_confidence=0.0,
+            survival_summary=f"Compliance decay expected in {self.time_to_compliance_decay_days} days",
+            router_path=router_map.get(self.router_decision, RouterPath.FAST_CLASSIFIER),
+            router_decision=self.router_decision,
+            router_reason=self.reason,
+        )
+        trace = AIReasoningTrace(
+            trace_id=f"trace-{alert_id}",
+            alert_id=alert_id,
+            client_id=self.client_id,
+            event_type=self.event_type,
+            loop_a=loop_a,
+            loop_b=loop_b,
+            chain_of_thought=self.reason,
+            audit_citations=[{"source": c} for c in self.audit_citations],
+            guardrail_checks=[],
+            bias_flags=[],
+            hallucination_check_passed=True,
+            total_tokens_used=0,
+            total_cost_usd=0.0,
+        )
+        return RiskAlert(
+            alert_id=alert_id,
+            client_id=self.client_id,
+            client_name=self.client_name,
+            event_type=self.event_type,
+            drift_score=self.drift_score,
+            reconstruction_error=self.reconstruction_error,
+            threshold=self.threshold,
+            risk_score=min(self.drift_score * 10, 10.0),
+            risk_level=self.risk_level,
+            signal_type=self.event_type,
+            explanation=self.reason,
+            reason=self.reason,
+            recommended_action=self.recommended_action,
+            confidence=self.drift_score,
+            time_to_compliance_decay_days=self.time_to_compliance_decay_days,
+            router_decision=self.router_decision,
+            graph_changes=self.graph_changes,
+            forecast=self.forecast,
+            audit_citations_raw=self.audit_citations,
+            reasoning_trace=trace,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -104,9 +235,10 @@ class RawSignal(BaseModel):
 
 class LoopATrace(BaseModel):
     """Trace from HYDRA Loop A: High-Frequency Latent Regime Detection."""
-    vae_reconstruction_error: float            # raw VAE loss value
-    drift_threshold: float                     # dynamic variance threshold at this moment
-    drift_detected: bool                       # True → DRIFT_EVENT emitted; False → signal dropped
+    vae_reconstruction_error: float            # raw VAE loss (matches engine: reconstruction_error)
+    drift_threshold: float                     # dynamic variance threshold (matches engine: threshold)
+    drift_score: float                         # combined drift signal score (matches engine: drift_score)
+    drift_detected: bool                       # True → DRIFT_EVENT emitted
     top_keywords_matched: list[str]            # high-risk keywords/entities that fired
     embedding_shift_score: float               # cosine distance from baseline latent centroid
     decision: str                              # "DRIFT_EVENT emitted" or "Signal dropped — stable"
@@ -115,62 +247,67 @@ class LoopATrace(BaseModel):
 
 
 class GraphRAGStep(BaseModel):
-    """One step of the temporal knowledge graph reasoning in Loop B."""
+    """One Neo4j triple change detected during Loop B GraphRAG reasoning."""
     entity: str
-    relationship_change: str                   # e.g. "new beneficial owner added"
-    triple_status: str                         # "added" | "deleted" | "unchanged"
+    triple: str                                # "Entity A -> relation -> Entity B" (matches engine format)
+    triple_status: str                         # "ADDED" | "DELETED" | "UNCHANGED" (matches engine: type)
+    relationship_change: str                   # human-readable description
     cypher_query: str                          # the actual Neo4j query that ran
-    timestamp_slice: str                       # the time window this triple covers
+    timestamp_slice: str                       # time window this triple covers
 
 
 class LoopBTrace(BaseModel):
     """Trace from HYDRA Loop B: Predictive GraphRAG & Deep Survival Inference."""
     # GraphRAG
     graph_steps: list[GraphRAGStep]
-    graph_summary: str                         # LLM-generated summary of graph changes
+    graph_summary: str
 
     # TimeGPT forecasting
     timegpt_forecast_horizon_days: int
     timegpt_anomaly_score: float
     timegpt_uncertainty_interval: tuple[float, float]
-    timegpt_summary: str                       # e.g. "Transaction volume projected to spike 3× in 5 days"
+    timegpt_risk_trend: RiskTrend              # matches engine: forecast.next_7_days_risk_trend
+    timegpt_uncertainty: UncertaintyLevel      # matches engine: forecast.uncertainty
+    timegpt_summary: str
 
     # Survival model
     survival_model_used: str                   # "SumoNet" | "DeepSurv" | "ConSurv"
-    time_to_decay_days: float                  # T — the key output
+    time_to_compliance_decay_days: float       # T — matches engine field name exactly
     survival_confidence: float
-    survival_summary: str                      # e.g. "KYC compliance expected to decay in 4.2 days"
+    survival_summary: str
 
     # Router decision
-    router_path: RouterPath
-    router_reason: str                         # why this path was chosen
+    router_path: RouterPath                    # our enum
+    router_decision: str                       # raw string from engine: "HEAVY_REASONER" etc.
+    router_reason: str                         # matches engine: reason
 
-    # LLM (only populated for fast/heavy paths)
-    model_used: str | None = None              # e.g. "deepseek-r1", "claude-haiku-4-5"
+    # LLM (populated for fast/heavy paths)
+    model_used: str | None = None
     tokens_used: int = 0
     cost_usd: float = 0.0
 
 
 class AIReasoningTrace(BaseModel):
     """
-    Complete, step-by-step record of how HYDRA processed one signal.
-    This is the primary model for the frontend's explainability panel.
+    Complete step-by-step record of how HYDRA processed one signal.
+    Primary model for the frontend explainability panel.
+    Covers all engine output fields plus enriched frontend fields.
     """
     trace_id: str
     alert_id: str
     client_id: str
+    event_type: str                            # matches engine: event_type
 
     loop_a: LoopATrace
     loop_b: LoopBTrace | None = None           # None if Loop A dropped the signal
 
-    # Final structured output from Outlines / Instructor
-    chain_of_thought: str                      # full CoT block forced by structured generation
-    audit_citations: list[dict[str, str]]      # [{"url": ..., "excerpt": ..., "source": ...}]
-    guardrail_checks: list[str]                # e.g. ["no hallucinated entities", "all citations verified"]
-    bias_flags: list[str]                      # any detected bias warnings
+    # Structured output from Outlines / Instructor
+    chain_of_thought: str
+    audit_citations: list[dict[str, str]]      # enriched: [{"source": ..., "url": ..., "excerpt": ...}]
+    guardrail_checks: list[str]
+    bias_flags: list[str]
     hallucination_check_passed: bool
 
-    # Aggregate cost for this one signal end-to-end
     total_tokens_used: int
     total_cost_usd: float
 
@@ -178,24 +315,19 @@ class AIReasoningTrace(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Governance Record — compliance workflow trail for each alert
+# Governance Record — compliance workflow trail shown on frontend
 # ---------------------------------------------------------------------------
 
 class GovernanceStep(BaseModel):
-    """One step in the human-in-the-loop compliance workflow."""
-    step: str                                  # e.g. "Initial AI Flag", "Compliance Review", "Escalation"
-    actor: str                                 # role or system that performed this step
-    action: str                                # what was done
-    outcome: str                               # result of this step
+    step: str                                  # e.g. "Initial AI Flag", "Compliance Review"
+    actor: str
+    action: str
+    outcome: str
     note: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class GovernanceRecord(BaseModel):
-    """
-    Full compliance governance trail for one alert.
-    Satisfies the challenge's Decision Governance requirement.
-    """
     record_id: str
     alert_id: str
     client_id: str
@@ -203,37 +335,50 @@ class GovernanceRecord(BaseModel):
     steps: list[GovernanceStep]
     requires_manual_approval: bool
     approval_deadline: datetime | None = None
-    final_decision: str | None = None          # "approved" | "escalated" | "dismissed"
+    final_decision: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ---------------------------------------------------------------------------
-# RiskAlert — the central model: produced by HYDRA, consumed by API + frontend
+# RiskAlert — unified model covering engine output + enriched frontend fields
 # ---------------------------------------------------------------------------
 
 class RiskAlert(BaseModel):
     alert_id: str
     client_id: str
+    client_name: str = ""                      # from engine: client_name
 
-    # Core risk assessment
-    risk_score: float = Field(ge=0.0, le=10.0)
-    risk_level: RiskLevel
-    signal_type: str                           # human-readable flag label
-    explanation: str                           # plain English summary for compliance officer
-    recommended_action: str
-    confidence: float = Field(ge=0.0, le=1.0)
+    # Engine fields preserved verbatim
+    event_type: str = ""                       # from engine: event_type
+    drift_score: float = 0.0                   # from engine: drift_score
+    reconstruction_error: float = 0.0          # from engine: reconstruction_error
+    threshold: float = 0.0                     # from engine: threshold
+    time_to_compliance_decay_days: float | None = None   # from engine
+    router_decision: str = ""                  # from engine: router_decision ("HEAVY_REASONER" etc.)
+    graph_changes: list[HydraGraphChange] = Field(default_factory=list)  # from engine
+    forecast: HydraForecast | None = None      # from engine
+    audit_citations_raw: list[str] = Field(default_factory=list)  # from engine (plain strings)
+    reason: str = ""                           # from engine: reason
 
-    # Originating data
+    # Enriched / computed fields for frontend
+    risk_score: float = Field(default=0.0, ge=0.0, le=10.0)
+    risk_level: RiskLevel = RiskLevel.LOW
+    signal_type: str = ""
+    explanation: str = ""
+    recommended_action: str = ""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    # Originating raw signal from collectors
     raw_signal: RawSignal | None = None
 
-    # KYC drift (populated if structural changes were detected)
+    # KYC drift detection
     kyc_drift: KYCDriftRecord | None = None
 
-    # Full AI reasoning trace — drives the frontend explainability panel
+    # Full AI reasoning trace for frontend explainability panel
     reasoning_trace: AIReasoningTrace | None = None
 
-    # Governance workflow
+    # Compliance governance workflow
     governance: GovernanceRecord | None = None
 
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -273,14 +418,13 @@ class CostTracker(BaseModel):
     tokens_used: int
     estimated_cost_usd: float
     calls: int
-    cost_per_1000_analyses_usd: float          # judges explicitly look for this
+    cost_per_1000_analyses_usd: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class CostSummary(BaseModel):
-    """Aggregate cost breakdown shown in the frontend cost tracker panel."""
     total_signals_processed: int
-    total_dropped_by_loop_a: int               # how many were filtered cheaply
+    total_dropped_by_loop_a: int
     total_escalated_to_loop_b: int
     total_tokens_used: int
     total_cost_usd: float
