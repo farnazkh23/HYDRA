@@ -81,24 +81,26 @@ function InvestigationPage() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const a = await getAlertById(id);
-      if (cancelled) return;
-      if (!a) {
-        setLoading(false);
-        return;
+      try {
+        const a = await getAlertById(id);
+        if (cancelled) return;
+        if (!a) { setLoading(false); return; }
+        setAlert(a as Alert);
+        setStatus(((a as Alert).status as CaseStatus) ?? "open");
+        const [t, d, g] = await Promise.all([
+          getReasoningTrace((a as Alert).id),
+          getKYCDriftRecord((a as Alert).customerId),
+          getGovernanceRecord((a as Alert).id),
+        ]);
+        if (cancelled) return;
+        setTrace(t ?? null);
+        setDrift(d ?? null);
+        setGov(g ?? null);
+      } catch {
+        // alert not found or fetch error — show not-found state
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setAlert(a);
-      setStatus((a.status as CaseStatus) ?? "open");
-      const [t, d, g] = await Promise.all([
-        getReasoningTrace(a.id),
-        getKYCDriftRecord(a.customerId),
-        getGovernanceRecord(a.id),
-      ]);
-      if (cancelled) return;
-      setTrace(t ?? null);
-      setDrift(d ?? null);
-      setGov(g ?? null);
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -107,15 +109,17 @@ function InvestigationPage() {
 
   const summary = useMemo(() => {
     if (!alert) return "";
-    const tg = trace?.loop_b.timegpt.summary;
-    const sv = trace?.loop_b.survival.summary;
+    const tg = trace?.loop_b?.timegpt?.summary;
+    const sv = trace?.loop_b?.survival?.summary;
+    const rationale = trace?.decision_rationale;
     return [
       `${alert.driftType} detected for ${alert.customerName}.`,
       tg ? `TimeGPT: ${tg}.` : null,
       sv ? `Survival model: ${sv}.` : null,
-      trace?.loop_b.router.path === "heavy"
+      trace?.loop_b?.router?.path === "heavy"
         ? "Routed to heavy reasoning path for escalation."
         : null,
+      !tg && !sv && rationale ? rationale : null,
     ]
       .filter(Boolean)
       .join(" ");
@@ -280,21 +284,36 @@ function InvestigationPage() {
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Stat label="Router path" v={trace.loop_b.router.path} />
-                  <Stat label="Model" v={trace.loop_b.router.model} />
+                  <Stat label="VAE error" v={String(trace.loop_a?.vae_reconstruction_error ?? "—")} />
+                  <Stat label="Drift score" v={String(trace.loop_a?.drift_score ?? "—")} />
                   <Stat label="Tokens" v={String(trace.total_tokens_used)} />
-                  <Stat label="Cost" v={`$${trace.total_cost_usd}`} />
+                  <Stat label="LLM cost" v={`$${trace.total_cost_usd}`} />
                 </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <SubCard title="Forecast (TimeGPT)">
-                    {trace.loop_b.timegpt.summary} · anomaly score{" "}
-                    {trace.loop_b.timegpt.anomaly_score}
-                  </SubCard>
-                  <SubCard title="Survival model">
-                    {trace.loop_b.survival.summary} · confidence{" "}
-                    {trace.loop_b.survival.confidence}
-                  </SubCard>
-                </div>
+                {trace.loop_a?.top_keywords?.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {trace.loop_a.top_keywords.map((kw: string) => (
+                      <span key={kw} className="rounded-md border border-neon/30 bg-neon-soft px-2 py-0.5 text-[11px] text-neon font-mono">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {trace.loop_b ? (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <SubCard title="Forecast (TimeGPT)">
+                      {trace.loop_b.timegpt?.summary} · anomaly score{" "}
+                      {trace.loop_b.timegpt?.anomaly_score}
+                    </SubCard>
+                    <SubCard title="Survival model">
+                      {trace.loop_b.survival?.summary} · confidence{" "}
+                      {trace.loop_b.survival?.confidence}
+                    </SubCard>
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-border bg-surface-2/40 px-3 py-2.5 text-xs text-muted-foreground">
+                    Loop B (GraphRAG · TimeGPT · Survival) pending — Layer 2 not yet triggered for this event.
+                  </div>
+                )}
               </Section>
             )}
 

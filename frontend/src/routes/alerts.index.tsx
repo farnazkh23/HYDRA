@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RiskBadge } from "@/components/ui/risk-badge";
-import { alerts as allAlerts } from "@/lib/mock-data";
-import type { RiskStatus } from "@/lib/types";
+import { getAlerts } from "@/lib/services";
+import type { Alert, RiskStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/alerts/")({
   head: () => ({ meta: [{ title: "Alerts — HYDRA" }] }),
@@ -14,7 +15,14 @@ const sevOrder: Record<string, number> = { high: 0, elevated: 1, medium: 2, low:
 
 function AlertsPage() {
   const navigate = useNavigate();
-  const alerts = [...allAlerts].sort(
+  const [rawAlerts, setRawAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAlerts().then((a) => setRawAlerts(a)).finally(() => setLoading(false));
+  }, []);
+
+  const alerts = [...rawAlerts].sort(
     (x, y) => (sevOrder[x.severity] ?? 9) - (sevOrder[y.severity] ?? 9),
   );
 
@@ -30,6 +38,12 @@ function AlertsPage() {
             Sorted by severity. Click a row to open the full investigation.
           </p>
         </header>
+
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 size={14} className="animate-spin" /> Loading alerts…
+          </div>
+        )}
 
         <div className="space-y-2">
           {alerts.map((a) => (

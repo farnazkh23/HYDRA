@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Activity, ShieldAlert, Users, TrendingUp } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Activity, ShieldAlert, Users, TrendingUp, Radio } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { NetworkGraph } from "@/components/NetworkGraph";
 import { RiskBadge } from "@/components/ui/risk-badge";
@@ -17,12 +17,37 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+function useLiveFeed() {
+  const [connected, setConnected] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
+  const [lastEvent, setLastEvent] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    const es = new EventSource("/api/events/stream");
+    esRef.current = es;
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "heartbeat") setAlertCount(msg.alert_count ?? 0);
+        if (msg.type === "new_alert") setLastEvent(msg.alert?.title ?? "New alert");
+      } catch {}
+    };
+    return () => { es.close(); setConnected(false); };
+  }, []);
+
+  return { connected, alertCount, lastEvent };
+}
+
 function Dashboard() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const live = useLiveFeed();
 
   useEffect(() => {
     getGraph().then((g) => {
@@ -68,11 +93,23 @@ function Dashboard() {
               this is what HYDRA is watching right now.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Kpi icon={Users} label="Customers" value={String(stats.total)} />
             <Kpi icon={ShieldAlert} label="High Risk" value={String(stats.high)} tone="high" />
             <Kpi icon={Activity} label="Elevated" value={String(stats.elev)} tone="elevated" />
             <Kpi icon={TrendingUp} label="Avg Drift" value={`${stats.driftAvg}%`} />
+            <div className="rounded-xl border border-border bg-card glass px-4 py-3 min-w-[120px] lime-outline flex flex-col justify-between">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <Radio size={12} /> Live
+              </div>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${live.connected ? "bg-neon animate-pulse" : "bg-muted-foreground"}`} />
+                <span className="text-sm font-semibold text-neon">{live.connected ? "Connected" : "Connecting…"}</span>
+              </div>
+              {live.alertCount > 0 && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">{live.alertCount} alert{live.alertCount !== 1 ? "s" : ""} in DB</div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -113,21 +150,23 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Latest alert
+                <Link to="/alerts">
+                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+                      Latest alert
+                    </div>
+                    {lastAlert ? (
+                      <>
+                        <div className="text-sm font-medium">{lastAlert.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {lastAlert.driftType} · {lastAlert.timestamp}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No recent alerts.</div>
+                    )}
                   </div>
-                  {lastAlert ? (
-                    <>
-                      <div className="text-sm font-medium">{lastAlert.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {lastAlert.driftType} · {lastAlert.timestamp}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No recent alerts.</div>
-                  )}
-                </div>
+                </Link>
               </>
             ) : (
               <div className="text-sm text-muted-foreground">
