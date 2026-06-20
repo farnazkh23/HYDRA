@@ -11,9 +11,11 @@ from backend.models import Layer1KycBaseline, RawSignal
 from backend.replay import load_raw_signals, model_to_json_dict, write_jsonl, write_raw_signals
 from stream_engine.drift_engine import KeywordDriftEngine
 from stream_engine.relevance import evaluate_relevance
+from stream_engine.vae_snapshots import append_nominal_snapshot
 
 
 DEFAULT_REPLAY_DIR = Path("data/layer1_replay")
+DEFAULT_VAE_SNAPSHOT_DIR = Path("data/layer1_vae_snapshots")
 MOCK_NEWS_QUERY_COST_UNITS = 0.0
 LIVE_NEWS_QUERY_COST_UNITS = 1.0
 
@@ -33,6 +35,7 @@ def run_layer1_pipeline(
     live: bool = False,
     replay_file: str | None = None,
     expand_adverse_news: bool = False,
+    vae_snapshot_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     baselines = load_layer1_baselines()
     baseline = baselines[client_id]
@@ -44,7 +47,7 @@ def run_layer1_pipeline(
         expand_adverse_news=expand_adverse_news,
     )
     signals = dedupe_signals(signals)
-    drift_engine = KeywordDriftEngine()
+    drift_engine = KeywordDriftEngine(vae_snapshot_dir=vae_snapshot_dir)
 
     events = []
     dropped_signals = []
@@ -53,6 +56,23 @@ def run_layer1_pipeline(
         if event:
             events.append(model_to_json_dict(event))
         else:
+            drop_reason = _drop_reason(baseline, signal)
+            snapshot_saved = False
+            if drop_reason == "stable_below_drift_threshold":
+                snapshot_saved = append_nominal_snapshot(
+                    client_id=baseline.client_id,
+                    snapshot_dir=vae_snapshot_dir,
+                    feature_vector=drift_engine.nominal_snapshot_for_signal(baseline, signal),
+                    metadata={
+                        "source": signal.source,
+                        "signal_type": signal.signal_type.value
+                        if hasattr(signal.signal_type, "value")
+                        else str(signal.signal_type),
+                        "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
+                        "provider": str(signal.metadata.get("provider", "")),
+                        "drop_reason": drop_reason,
+                    },
+                )
             dropped_signals.append(
                 {
                     "client_id": signal.client_id,
@@ -62,7 +82,8 @@ def run_layer1_pipeline(
                     else str(signal.signal_type),
                     "source": signal.source,
                     "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
-                    "drop_reason": _drop_reason(baseline, signal),
+                    "drop_reason": drop_reason,
+                    "vae_snapshot_saved": snapshot_saved,
                     "timestamp": signal.timestamp.isoformat(),
                 }
             )
@@ -192,6 +213,11 @@ def main() -> None:
     )
     parser.add_argument("--replay-file", help="Read RawSignal records from a JSONL replay file instead of collecting news.")
     parser.add_argument(
+        "--vae-snapshot-dir",
+        default=str(DEFAULT_VAE_SNAPSHOT_DIR),
+        help="Directory for stable feature snapshots used by the lightweight VAE time-series buffer.",
+    )
+    parser.add_argument(
         "--write-replay-dir",
         nargs="?",
         const=str(DEFAULT_REPLAY_DIR),
@@ -205,6 +231,7 @@ def main() -> None:
         live=args.live,
         replay_file=args.replay_file,
         expand_adverse_news=args.expand_adverse_news,
+        vae_snapshot_dir=args.vae_snapshot_dir,
     )
     if args.write_replay_dir:
         _write_replay_outputs(args.write_replay_dir, payload)
