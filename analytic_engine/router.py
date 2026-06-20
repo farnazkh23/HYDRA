@@ -23,7 +23,7 @@ class CostAwareCascadingRouter:
         Sovereign Gateway Routing Module.
         Connected directly to the Swiss AI Initiative Apertus platform via PublicAI.
         """
-        self.api_key = os.getenv("APERTUS_API_KEY")
+        self.api_key = "s" #os.getenv("APERTUS_API_KEY")
         self.client = None
 
         if not self.api_key:
