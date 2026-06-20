@@ -66,6 +66,12 @@ def run_layer1_pipeline(
                     "timestamp": signal.timestamp.isoformat(),
                 }
             )
+    _assign_event_cost_units(
+        events=events,
+        live=live,
+        replay_file=replay_file,
+        news_queries=news_queries,
+    )
     return {
         "drift_events": events,
         "raw_signals": signals,
@@ -101,7 +107,7 @@ def _load_or_collect_signals(
         company_name=baseline.legal_name,
         limit=limit,
     )
-    return signals, news_collector.last_query_count if live else 1
+    return signals, news_collector.last_query_count if live else 0
 
 
 def _drop_reason(baseline: Layer1KycBaseline, signal: RawSignal) -> str:
@@ -117,6 +123,25 @@ def _write_replay_outputs(output_dir: str | Path, payload: dict[str, Any]) -> No
     write_jsonl(replay_dir / "drift_events.jsonl", payload["drift_events"])
     write_jsonl(replay_dir / "dropped_signals.jsonl", payload["dropped_signals"])
     write_jsonl(replay_dir / "layer1_metrics.jsonl", [payload["layer1_metrics"]])
+
+
+def _assign_event_cost_units(
+    events: list[dict[str, Any]],
+    live: bool,
+    replay_file: str | None,
+    news_queries: int,
+) -> None:
+    if not events:
+        return
+    news_query_cost = 0.0
+    if live and not replay_file:
+        news_query_cost = round(news_queries / len(events), 4)
+    for event in events:
+        event["layer1_cost_units"] = {
+            "news_queries": news_query_cost,
+            "llm_tokens": 0.0,
+            "heavy_reasoner_calls": 0.0,
+        }
 
 
 def _build_layer1_metrics(

@@ -54,6 +54,16 @@ python3 main.py --client-id demo-spacex-001 --limit 3 --live --expand-adverse-ne
 
 `--expand-adverse-news` runs the base company query plus adverse queries such as investigation, lawsuit, export control, governance, and offshore. Use small limits and replay files to control Event Registry cost.
 
+Optional local ONNX dense encoder:
+
+```bash
+export LAYER1_ONNX_MODEL_PATH="models/layer1_dense/model.onnx"
+export LAYER1_ONNX_TOKENIZER_PATH="models/layer1_dense"
+python3 main.py --client-id demo-spacex-001 --limit 10
+```
+
+If the ONNX model, tokenizer, or local runtime dependencies are unavailable, Layer 1 automatically falls back to local TF-IDF, then deterministic hashing. This keeps replay/tests zero-credit and stable.
+
 ## Contract for Layer 2
 
 Layer 2 should consume the `drift_events` array from CLI output or `run_layer1()` in `main.py`.
@@ -88,7 +98,7 @@ Treat these fields as stable:
   },
   "loop_a_trace": {
     "trace_mode": "vae_compatible_proxy",
-    "reconstruction_engine": "vae_compatible_statistical_proxy",
+    "reconstruction_engine": "local_pca_reconstruction",
     "vae_reconstruction_error": 0.9,
     "drift_threshold": 0.35,
     "dynamic_variance": 0.0036,
@@ -112,7 +122,8 @@ Treat these fields as stable:
       "nominal_std": 0.06
     },
     "sparse_encoder": {
-      "encoder": "local_exact_activation",
+      "encoder": "local_splade_style_sparse",
+      "weighting": "log_tf_keyword_entity",
       "activation_count": 8,
       "matched_entities": ["SpaceX", "Elon Musk"],
       "activations": {
@@ -121,8 +132,8 @@ Treat these fields as stable:
       }
     },
     "dense_encoder": {
-      "encoder": "local_hashing_embedding",
-      "dimensions": 32,
+      "encoder": "local_tfidf_embedding",
+      "dimensions": 128,
       "baseline_similarity": 0.39,
       "semantic_shift_score": 0.61,
       "signal_norm": 1.0,
@@ -185,7 +196,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
   "events_emitted": 2,
   "drop_rate": 0.3333,
   "emission_rate": 0.6667,
-  "news_queries": 1,
+  "news_queries": 0,
   "llm_tokens": 0,
   "heavy_reasoner_calls": 0,
   "estimated_cost_units": 0.0,
@@ -197,7 +208,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 - **Live news ingestion:** Event Registry API is the official News MCP/news-source path for this project; live mode is opt-in via `--live`, and adverse query expansion is opt-in via `--expand-adverse-news`.
 - **Cost control:** default mode is mock/replay, live raw signals can be saved to JSONL, and replay runs use `news_queries: 0`.
-- **Loop A gate:** relevance filtering, sparse/dense/hybrid local features, VAE-compatible reconstruction proxy, dynamic threshold, and stable-signal drop are implemented.
+- **Loop A gate:** relevance filtering, local SPLADE-style weighted sparse features, optional local ONNX dense encoding, local TF-IDF/hash fallback, hybrid features, local PCA reconstruction with statistical fallback, dynamic threshold, and stable-signal drop are implemented.
 - **Layer 2 contract:** emitted `DRIFT_EVENT` payloads include citations, scoring breakdown, `loop_a_trace`, relationship hints, and stable schema fields.
 - **Quality controls:** URL/title dedupe runs before scoring for live and replay article signals; unit tests cover mock, replay, relevance, dedupe, schema, and scoring.
 
@@ -206,7 +217,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 - `severity` is derived from `drift_score`: `medium`, `high`, or `critical`.
 - `routing_hint` is advisory only; Layer 2 can still override routing.
 - `relevance_gate` prevents unrelated public signals from reaching Layer 2 even if they contain generic risk terms.
-- `loop_a_trace` is currently a VAE-compatible proxy; the interface can be swapped for a real VAE without changing Layer 2’s contract.
+- `loop_a_trace` is currently VAE-compatible and uses local PCA reconstruction when sklearn is available; the interface can be swapped for a real VAE without changing Layer 2’s contract.
 - `source_metadata.related_entities`, `relationship_hints`, and `entity_roles` are lightweight hints for Layer 2 GraphRAG.
 - `citations` are the audit trail Layer 2 should preserve in any final explanation.
 - Layer 1 does not use LLM tokens or heavy reasoner calls.
@@ -219,9 +230,9 @@ No open P0 items.
 
 ### P1
 
-1. Replace proxy sparse features with SPLADE-style sparse encoding while keeping the existing `loop_a_trace.sparse_encoder` contract.
-2. Replace local hashing dense features with a local ONNX transformer or approved free local model while keeping the existing `loop_a_trace.dense_encoder` contract.
-3. Replace the VAE-compatible statistical proxy with a fitted lightweight VAE and learned dynamic threshold.
+1. Replace local SPLADE-style sparse features with true SPLADE if needed.
+2. Add an approved local ONNX model artifact/tokenizer and runtime dependency notes so the existing `local_onnx_transformer` adapter can run in every teammate environment.
+3. Replace local PCA/statistical reconstruction with a fitted lightweight VAE and learned dynamic threshold.
 4. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
 5. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
 

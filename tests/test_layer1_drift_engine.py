@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from backend.collectors.news import mock_company_news
 from backend.kyc.store import load_layer1_baselines
@@ -13,6 +14,7 @@ from stream_engine.scoring_config import (
     Layer1Weights,
     load_layer1_scoring_config,
 )
+from stream_engine.vectorizer import build_default_dense_vectorizer
 
 
 class KeywordDriftEngineTests(unittest.TestCase):
@@ -78,6 +80,15 @@ class KeywordDriftEngineTests(unittest.TestCase):
 
         self.assertIsNone(event)
 
+    def test_missing_onnx_model_path_falls_back_to_local_dense_encoder(self) -> None:
+        with patch.dict("os.environ", {"LAYER1_ONNX_MODEL_PATH": "/tmp/missing-layer1-model.onnx"}):
+            dense_vectorizer = build_default_dense_vectorizer()
+
+        self.assertIn(
+            dense_vectorizer.encoder,
+            {"local_tfidf_embedding", "local_hashing_embedding"},
+        )
+
     def test_risky_signal_emits_versioned_drift_event(self) -> None:
         risky_signal = list(mock_company_news(self.baseline.client_id, self.baseline.legal_name))[1]
 
@@ -94,13 +105,14 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertEqual(event.scoring_breakdown["risk_term_score"], 0.72)
         self.assertEqual(event.scoring_breakdown["adverse_sentiment_score"], 0.084)
         self.assertEqual(event.loop_a_trace["trace_mode"], "vae_compatible_proxy")
-        self.assertEqual(
+        self.assertIn(
             event.loop_a_trace["reconstruction_engine"],
-            "vae_compatible_statistical_proxy",
+            {"local_pca_reconstruction", "vae_compatible_statistical_proxy"},
         )
         self.assertEqual(event.loop_a_trace["vae_reconstruction_error"], 1.0)
         self.assertEqual(event.loop_a_trace["drift_threshold"], 0.35)
         self.assertIn("nominal_mean", event.loop_a_trace["nominal_profile"])
+        self.assertIn("fit_mode", event.loop_a_trace["nominal_profile"])
         self.assertIn("dynamic_threshold", event.scoring_breakdown)
         self.assertIn("reconstruction_error", event.scoring_breakdown)
         self.assertEqual(event.scoring_breakdown["relevance_score"], 1.0)
@@ -112,7 +124,11 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertIn("investigation", event.loop_a_trace["top_keywords_matched"])
         self.assertEqual(
             event.loop_a_trace["sparse_encoder"]["encoder"],
-            "local_exact_activation",
+            "local_splade_style_sparse",
+        )
+        self.assertEqual(
+            event.loop_a_trace["sparse_encoder"]["weighting"],
+            "log_tf_keyword_entity",
         )
         self.assertIn(
             "risk::investigation",
@@ -126,11 +142,11 @@ class KeywordDriftEngineTests(unittest.TestCase):
             "Elon Musk",
             event.loop_a_trace["sparse_encoder"]["matched_entities"],
         )
-        self.assertEqual(
+        self.assertIn(
             event.loop_a_trace["dense_encoder"]["encoder"],
-            "local_hashing_embedding",
+            {"local_onnx_transformer", "local_tfidf_embedding", "local_hashing_embedding"},
         )
-        self.assertEqual(event.loop_a_trace["dense_encoder"]["dimensions"], 32)
+        self.assertGreater(event.loop_a_trace["dense_encoder"]["dimensions"], 0)
         self.assertGreaterEqual(event.loop_a_trace["embedding_shift_score"], 0.0)
         self.assertLessEqual(event.loop_a_trace["embedding_shift_score"], 1.0)
         self.assertGreaterEqual(

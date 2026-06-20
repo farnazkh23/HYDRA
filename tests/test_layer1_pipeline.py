@@ -26,6 +26,13 @@ class Layer1PipelineTests(unittest.TestCase):
         self.assertEqual(payload["layer1_metrics"]["events_emitted"], 2)
         self.assertEqual(payload["layer1_metrics"]["signals_dropped"], 1)
         self.assertEqual(payload["layer1_metrics"]["drop_rate"], 0.3333)
+        self.assertEqual(payload["layer1_metrics"]["news_queries"], 0)
+        self.assertTrue(
+            all(
+                event["layer1_cost_units"]["news_queries"] == 0.0
+                for event in payload["drift_events"]
+            )
+        )
 
     def test_replay_round_trip_does_not_require_live_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -52,6 +59,12 @@ class Layer1PipelineTests(unittest.TestCase):
             self.assertEqual(len(replayed["drift_events"]), 2)
             self.assertEqual(replayed["layer1_metrics"]["mode"], "replay")
             self.assertEqual(replayed["layer1_metrics"]["news_queries"], 0)
+            self.assertTrue(
+                all(
+                    event["layer1_cost_units"]["news_queries"] == 0.0
+                    for event in replayed["drift_events"]
+                )
+            )
 
     def test_replay_irrelevant_signal_has_specific_drop_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

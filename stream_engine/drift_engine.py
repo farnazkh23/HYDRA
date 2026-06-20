@@ -4,13 +4,13 @@ import hashlib
 
 from backend.models import DriftEvent, DriftSeverity, Layer1KycBaseline, RawSignal
 from stream_engine.relevance import evaluate_relevance
-from stream_engine.reconstruction import VAECompatibleReconstructionEngine
+from stream_engine.reconstruction import build_default_reconstruction_engine
 from stream_engine.relationship_context import extract_relationship_context
 from stream_engine.scoring_config import Layer1ScoringConfig, load_layer1_scoring_config
 from stream_engine.vectorizer import (
     HybridSignalVectorizer,
-    LocalHashingDenseVectorizer,
     SparseSignalVectorizer,
+    build_default_dense_vectorizer,
 )
 
 
@@ -20,9 +20,9 @@ class KeywordDriftEngine:
     def __init__(self, scoring_config: Layer1ScoringConfig | None = None) -> None:
         self.scoring_config = scoring_config or load_layer1_scoring_config()
         self.sparse_vectorizer = SparseSignalVectorizer()
-        self.dense_vectorizer = LocalHashingDenseVectorizer()
+        self.dense_vectorizer = build_default_dense_vectorizer()
         self.hybrid_vectorizer = HybridSignalVectorizer()
-        self.reconstruction_engine = VAECompatibleReconstructionEngine()
+        self.reconstruction_engine = build_default_reconstruction_engine()
 
     def score_signal(self, baseline: Layer1KycBaseline, signal: RawSignal) -> DriftEvent | None:
         weights = self.scoring_config.weights
@@ -133,7 +133,8 @@ class KeywordDriftEngine:
                 "cost_usd": 0.0,
                 "nominal_profile": reconstruction_result.nominal_profile,
                 "sparse_encoder": {
-                    "encoder": "local_exact_activation",
+                    "encoder": sparse_features.encoder,
+                    "weighting": "log_tf_keyword_entity",
                     "activation_count": sparse_features.activation_count,
                     "matched_entities": sparse_features.matched_entities,
                     "activations": sparse_features.activations,
