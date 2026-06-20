@@ -76,7 +76,7 @@ function SettingsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-card glass p-5">
+    <div className="rounded-2xl border border-border bg-card glass p-5 lime-outline">
       <h3 className="font-display font-semibold mb-4">{title}</h3>
       <div className="space-y-3">{children}</div>
     </div>

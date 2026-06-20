@@ -107,7 +107,7 @@ function AlertsPage() {
                   navigate({ to: "/alerts/$id", params: { id: alert.id } });
                 }
               }}
-              className="group cursor-pointer rounded-xl border border-border bg-card glass px-4 py-3 grid grid-cols-[auto_1fr_auto] gap-4 items-center transition-all duration-200 hover:border-neon/50 hover:bg-surface-2/60 hover:shadow-[0_0_0_1px_oklch(0.92_0.22_128/0.18),0_8px_28px_-12px_oklch(0.92_0.22_128/0.25)] focus:outline-none focus:border-neon/60"
+              className="group cursor-pointer rounded-xl border border-border bg-card glass px-4 py-3 grid grid-cols-[auto_1fr_auto] gap-4 items-center transition-all duration-200 hover:border-neon/50 hover:bg-surface-2/60 hover:shadow-[0_0_0_1px_oklch(0.92_0.22_128/0.18),0_8px_28px_-12px_oklch(0.92_0.22_128/0.25)] focus:outline-none focus:border-neon/60 lime-outline"
             >
               <AlertTriangle
                 size={20}
