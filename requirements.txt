@@ -1,0 +1,11 @@
+pydantic>=2.0
+pyyaml
+instructor
+outlines
+nixtla>=0.7.0
+pandas>=2.0.0
+neo4j
+torch
+numpy
+streamlit
+python-fasthtml
