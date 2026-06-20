@@ -291,6 +291,47 @@
       "domain": "roche.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-palantir-001",
+      "legal_name": "Palantir Technologies",
+      "jurisdiction": "US",
+      "baseline_business_model": "Data analytics platforms, AI-driven intelligence software, and government and enterprise data infrastructure",
+      "expected_activity": [
+        "government intelligence and defence contracts",
+        "enterprise data platform licensing",
+        "AI and machine learning platform deployment",
+        "data integration and analytics services"
+      ],
+      "expected_keywords": [
+        "data analytics",
+        "AI platform",
+        "government contract",
+        "defence",
+        "intelligence software"
+      ],
+      "expected_jurisdictions": [
+        "US",
+        "UK",
+        "EU"
+      ],
+      "expected_monthly_volume_chf": 60000000,
+      "risk_appetite": "Elevated; low tolerance for surveillance ethics violations, export control breaches, government contract irregularities, or beneficial ownership drift.",
+      "expected_transaction_profile": "Recurring government, intelligence agency, and enterprise software licensing and data services activity tied to known public-sector and commercial counterparties.",
+      "ownership_assumptions": [
+        "Alex Karp is treated as a key public person for media and governance context.",
+        "Peter Thiel is a known major shareholder — no unexpected offshore control expected beyond disclosed positions."
+      ],
+      "monitored_public_entities": [
+        "Palantir",
+        "Alex Karp",
+        "Peter Thiel",
+        "Palantir Technologies"
+      ],
+      "website": "https://www.palantir.com",
+      "domain": "palantir.com",
+      "risk_rating": "elevated",
+      "last_kyc_review": "2026-01-20"
     }
   ]
 }
