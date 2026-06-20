@@ -300,8 +300,9 @@ No open P1 items.
 
 ### P2 (Optional)
 
-1. Replace local SPLADE-style sparse features with true SPLADE if needed.
-2. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
-3. Add latency/throughput benchmark.
-4. Add multi-client runner only if the demo needs portfolio-level monitoring.
-5. Add basic data-safety guardrails to avoid leaking unnecessary internal baseline details downstream.
+1. Add multi-client runner only if the demo needs portfolio-level monitoring.
+2. Add latency/throughput benchmark.
+3. Replace local SPLADE-style sparse features with true SPLADE if needed.
+4. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
+5. Add basic data-safety guardrails (for safety concerns).
+
