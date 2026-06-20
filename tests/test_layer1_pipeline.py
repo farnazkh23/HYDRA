@@ -11,7 +11,7 @@ from main import _write_replay_outputs, run_layer1_pipeline
 class Layer1PipelineTests(unittest.TestCase):
     def test_mock_pipeline_emits_events_and_metrics(self) -> None:
         payload = run_layer1_pipeline(
-            client_id="demo-aminaclient-001",
+            client_id="demo-spacex-001",
             limit=10,
             live=False,
         )
@@ -29,7 +29,7 @@ class Layer1PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             replay_dir = Path(temp_dir)
             original = run_layer1_pipeline(
-                client_id="demo-aminaclient-001",
+                client_id="demo-spacex-001",
                 limit=10,
                 live=False,
             )
@@ -41,7 +41,7 @@ class Layer1PipelineTests(unittest.TestCase):
             self.assertEqual((replay_dir / "layer1_metrics.jsonl").read_text().count("\n"), 1)
 
             replayed = run_layer1_pipeline(
-                client_id="demo-aminaclient-001",
+                client_id="demo-spacex-001",
                 limit=10,
                 live=False,
                 replay_file=str(replay_dir / "raw_signals.jsonl"),

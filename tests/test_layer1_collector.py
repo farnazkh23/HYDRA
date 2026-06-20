@@ -11,8 +11,8 @@ class EventRegistryNewsCollectorTests(unittest.TestCase):
         collector = EventRegistryNewsCollector(enabled=False)
 
         signals = collector.fetch_company_news(
-            client_id="demo-aminaclient-001",
-            company_name="HelioPay AG",
+            client_id="demo-spacex-001",
+            company_name="SpaceX",
             limit=10,
         )
 

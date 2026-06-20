@@ -16,19 +16,19 @@ Layer 1 does **not** run LLM reasoning, graph fusion, survival modeling, or fina
 ## Run Locally
 
 ```bash
-python3 main.py --client-id demo-aminaclient-001 --limit 10
+python3 main.py --client-id demo-spacex-001 --limit 10
 ```
 
 Write replay files without live API calls:
 
 ```bash
-python3 main.py --client-id demo-aminaclient-001 --limit 10 --write-replay-dir data/layer1_replay
+python3 main.py --client-id demo-spacex-001 --limit 10 --write-replay-dir data/layer1_replay
 ```
 
 Replay cached raw signals:
 
 ```bash
-python3 main.py --client-id demo-aminaclient-001 --replay-file data/layer1_replay/raw_signals.jsonl
+python3 main.py --client-id demo-spacex-001 --replay-file data/layer1_replay/raw_signals.jsonl
 ```
 
 Run Layer 1 unit tests:
@@ -41,7 +41,7 @@ Optional live news:
 
 ```bash
 export EVENT_REGISTRY_API_KEY="..."
-python3 main.py --client-id demo-aminaclient-001 --limit 10 --live --write-replay-dir data/layer1_replay
+python3 main.py --client-id demo-spacex-001 --limit 10 --live --write-replay-dir data/layer1_replay
 ```
 
 ## Contract for Layer 2
@@ -54,8 +54,8 @@ Treat these fields as stable:
   "schema_version": "layer1.drift_event.v1",
   "event_type": "DRIFT_EVENT",
   "event_id": "drift_...",
-  "client_id": "demo-aminaclient-001",
-  "client_name": "HelioPay AG",
+  "client_id": "demo-spacex-001",
+  "client_name": "SpaceX",
   "routing_hint": "layer2_structural_reasoning",
   "severity": "high",
   "drift_score": 0.84,
@@ -84,12 +84,13 @@ Treat these fields as stable:
     "signal_type": "news",
     "source": "event_registry",
     "provider": "event_registry",
-    "entity_name": "HelioPay AG",
-    "related_entities": ["Atlas Digital Ltd"],
-    "relationship_hints": ["offshore_link", "business_pivot"],
+    "entity_name": "SpaceX",
+    "related_entities": ["Elon Musk", "Orbital Ventures Ltd"],
+    "relationship_hints": ["partnership", "regulatory_investigation", "offshore_link"],
     "entity_roles": {
-      "HelioPay AG": "monitored_client",
-      "Atlas Digital Ltd": "ownership_related_entity"
+      "SpaceX": "monitored_client",
+      "Elon Musk": "beneficial_owner_or_key_person",
+      "Orbital Ventures Ltd": "partner_or_counterparty"
     }
   },
   "layer1_cost_units": {
@@ -105,7 +106,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 ```json
 {
   "schema_version": "layer1.metrics.v1",
-  "client_id": "demo-aminaclient-001",
+  "client_id": "demo-spacex-001",
   "mode": "mock",
   "signals_processed": 3,
   "signals_dropped": 1,
@@ -149,7 +150,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 ### P1
 
 1. Improve the KYC baseline beyond keywords: business model, jurisdictions, expected activity, ownership assumptions, risk appetite, expected transaction profile, website/domain, and last KYC review.
-2. Add at least one non-news public source adapter: sanctions/watchlists, registry/entity changes, domain/website changes, or funding/expansion signals.
+2. Add at least one non-news public source adapter relevant to Layer 1: registry/entity changes, domain/website changes, or funding/expansion signals.
 3. Add explainable scoring components: risk terms, baseline mismatch, source recency, source reliability, entity match, adverse sentiment, and signal type.
 4. Add audit logging for accepted and dropped signals, including drop reason and source citation.
 5. Move thresholds and high-risk terms into config so compliance/risk teammates can tune them without editing code.

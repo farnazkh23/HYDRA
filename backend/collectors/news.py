@@ -197,19 +197,28 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
     now = datetime.now(timezone.utc)
     samples = [
         {
-            "title": f"{company_name} expands invoice automation platform in Switzerland",
-            "summary": "The company announced new integrations for SME payment workflows and accounting tools.",
-            "url": "mock://news/helipay-sme-expansion",
+            "title": f"{company_name} expands Starlink satellite service capacity",
+            "summary": "The company announced additional launch capacity and satellite internet coverage improvements.",
+            "url": "mock://news/spacex-starlink-expansion",
+            "related_entities": ["Elon Musk"],
+            "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
         },
         {
-            "title": f"{company_name} reportedly pivots into crypto exchange services after offshore partnership",
-            "summary": "Industry sources say the firm is testing crypto exchange functionality with offshore partner Atlas Digital Ltd and an undisclosed beneficial owner.",
-            "url": "mock://news/helipay-crypto-offshore-pivot",
+            "title": f"{company_name} faces regulatory investigation over offshore launch-services partnership",
+            "summary": f"Reports say {company_name} and Elon Musk are under review after a proposed partnership with Orbital Ventures Ltd raised export control and governance questions.",
+            "url": "mock://news/spacex-offshore-investigation",
+            "related_entities": ["Elon Musk", "Orbital Ventures Ltd"],
+            "entity_roles": {
+                "Elon Musk": "beneficial_owner_or_key_person",
+                "Orbital Ventures Ltd": "partner_or_counterparty",
+            },
         },
         {
-            "title": "Regulators open investigation into payment firms linked to suspected money laundering network",
-            "summary": f"{company_name} was named among several fintechs being reviewed for unusual transaction flows and beneficial owner transparency.",
-            "url": "mock://news/payment-firms-investigation",
+            "title": f"Governance lawsuit names Elon Musk in dispute linked to {company_name} financing",
+            "summary": f"A shareholder lawsuit alleges governance concerns around related-party financing and {company_name} board oversight.",
+            "url": "mock://news/spacex-governance-lawsuit",
+            "related_entities": ["Elon Musk"],
+            "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
         },
     ]
     for sample in samples:
@@ -226,6 +235,8 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
                 "url": sample["url"],
                 "published_at": now.isoformat(),
                 "provider": "mock",
+                "related_entities": sample.get("related_entities", []),
+                "entity_roles": sample.get("entity_roles", {}),
             },
         )
 

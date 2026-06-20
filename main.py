@@ -140,7 +140,7 @@ def _build_layer1_metrics(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Layer 1 public intelligence drift detection.")
-    parser.add_argument("--client-id", default="demo-aminaclient-001")
+    parser.add_argument("--client-id", default="demo-spacex-001")
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--live", action="store_true", help="Allow live Event Registry calls. Defaults to mock/replay only.")
     parser.add_argument("--replay-file", help="Read RawSignal records from a JSONL replay file instead of collecting news.")
