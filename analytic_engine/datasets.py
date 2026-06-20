@@ -17,34 +17,50 @@ class ComplianceMultiModalDataset:
             "mutation_ratio": 0.0
         }
 
+        # Empirical scaling bounds to map explosive telemetry into stable [0, 1] ranges
+        self.severity_max_bound = 50000.0
+
     def impute_and_vectorize(self, time_series_metrics: Dict, graph_metrics: Dict) -> torch.Tensor:
         """
         Ingests unstructured state metrics, handles missing fields, and returns a continuous tensor.
 
         Packed Feature Dimension Layout:
         - X[0]: Volumetric Anomaly Indicator Flag (0.0 or 1.0)
-        - X[1]: Structural Volumetric Severity Score (Imputed if missing)
-        - X[2]: Active Graph Topological Edge Count (Imputed if missing)
+        - X[1]: Structural Volumetric Severity Score (Scaled & Imputed if missing)
+        - X[2]: Active Graph Topological Edge Count (Log-normalized & Imputed)
         - X[3]: Core Relationship Mutation Ratio (Added / Total Mutations)
         """
-        # 1. Process Layer 2 Statistical Signals
+        # 1. Process Layer 2 Statistical Signals safely
         anomaly_flag = 1.0 if time_series_metrics.get("anomaly_flag", False) else 0.0
 
-        severity_score = time_series_metrics.get("severity_score")
-        if severity_score is None or np.isnan(float(severity_score)):
+        try:
+            severity_raw = time_series_metrics.get("severity_score")
+            if severity_raw is None or np.isnan(float(severity_raw)):
+                severity_score = self.fallback_imputations["severity_score"]
+            else:
+                # Apply min-max clipping bound to protect downstream neural networks against gradient explosion
+                severity_score = min(float(severity_raw) / self.severity_max_bound, 1.0)
+        except (ValueError, TypeError):
             severity_score = self.fallback_imputations["severity_score"]
-        else:
-            severity_score = float(severity_score)
 
-        # 2. Process Layer 1 Graph Topology Parameters
-        total_edges = graph_metrics.get("total_active_edges")
-        if total_edges is None or np.isnan(float(total_edges)):
-            total_edges = self.fallback_imputations["total_active_edges"]
-        else:
-            total_edges = float(total_edges)
+        # 2. Process Layer 1 Graph Topology Parameters safely
+        try:
+            total_edges_raw = graph_metrics.get("total_active_edges")
+            if total_edges_raw is None or np.isnan(float(total_edges_raw)):
+                total_edges = self.fallback_imputations["total_active_edges"]
+            else:
+                # Apply log-normalization to pull long-tail hub nodes back into scale distribution bounds
+                total_edges = float(np.log1p(max(0.0, float(total_edges_raw))))
+        except (ValueError, TypeError):
+            total_edges = float(np.log1p(self.fallback_imputations["total_active_edges"]))
 
-        added = float(graph_metrics.get("triples_added_count", 0.0))
-        deleted = float(graph_metrics.get("triples_deleted_count", 0.0))
+        added = 0.0
+        deleted = 0.0
+        try:
+            added = float(graph_metrics.get("triples_added_count", 0.0))
+            deleted = float(graph_metrics.get("triples_deleted_count", 0.0))
+        except (ValueError, TypeError):
+            pass
 
         # Safe mathematical ratio check protecting against division-by-zero crashes
         if (added + deleted) == 0.0:
@@ -68,12 +84,10 @@ class ComplianceMultiModalDataset:
 if __name__ == "__main__":
     print("Testing Step 3: Imputation and PyTorch Tensor Processing Pipeline...")
 
-    # Mirroring the active dictionaries from your specific live terminal logs
     mock_live_ts = {'forecasted_mean': 150.03392, 'anomaly_flag': True, 'severity_score': 16662.8986}
     mock_live_graph = {'total_active_edges': 8.0, 'triples_added_count': 1.0, 'triples_deleted_count': 1.0}
 
-    # Mirroring a corrupted/incomplete ingestion signal to stress-test your imputation bounds
-    corrupted_ts = {'forecasted_mean': None, 'anomaly_flag': False, 'severity_score': None}
+    corrupted_ts = {'forecasted_mean': None, 'anomaly_flag': False, 'severity_score': "MALFORMED_STRING"}
     corrupted_graph = {'total_active_edges': float('nan'), 'triples_added_count': 0.0, 'triples_deleted_count': 0.0}
 
     processor = ComplianceMultiModalDataset()
