@@ -179,7 +179,7 @@ function PortfolioPage() {
                   </div>
                   <div className="font-display font-semibold flex items-center gap-2">
                     <Zap size={16} className="text-neon" />
-                    {droppedPct}% of signals dropped cheaply — only {escalatedPct}% escalate to Layer 2
+                    {droppedPct}% of signals filtered at zero LLM cost — {escalatedPct}% escalated to Layer 2
                   </div>
                 </div>
                 <div className="text-right">
@@ -196,8 +196,8 @@ function PortfolioPage() {
                 />
               </div>
               <div className="flex justify-between text-[11px] text-muted-foreground mt-2">
-                <span className="text-neon/70">{droppedPct}% dropped (no LLM cost)</span>
-                <span className="text-[color:var(--risk-elevated)]">{escalatedPct}% escalated to Layer 2</span>
+                <span className="text-neon/70">{droppedPct}% stable — dropped at zero cost</span>
+                <span className="text-[color:var(--risk-elevated)]">{escalatedPct}% flagged — routed to Layer 2</span>
               </div>
             </div>
 
