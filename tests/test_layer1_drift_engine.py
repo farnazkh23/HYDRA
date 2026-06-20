@@ -57,8 +57,13 @@ class KeywordDriftEngineTests(unittest.TestCase):
     def test_spacex_baseline_has_nominal_behavior_context(self) -> None:
         baselines = load_layer1_baselines()
 
-        self.assertGreaterEqual(len(baselines), 3)
+        self.assertEqual(len(baselines), 8)
+        self.assertIn("demo-amazon-001", baselines)
+        self.assertIn("demo-nvidia-001", baselines)
+        self.assertIn("demo-binance-001", baselines)
+        self.assertIn("demo-openai-001", baselines)
         self.assertIn("demo-apple-001", baselines)
+        self.assertIn("demo-meta-001", baselines)
         self.assertIn("demo-tesla-001", baselines)
         self.assertIn("Starlink", self.baseline.monitored_public_entities)
         self.assertIn("Elon Musk", self.baseline.monitored_public_entities)

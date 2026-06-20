@@ -269,7 +269,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 ## Current MVP Coverage
 
-- **Demo personas:** three monitored personas are supported out of the box: `demo-spacex-001`, `demo-apple-001`, and `demo-tesla-001`.
+- **Demo personas:** eight frontend portfolio personas are supported out of the box: `demo-spacex-001`, `demo-amazon-001`, `demo-nvidia-001`, `demo-binance-001`, `demo-tesla-001`, `demo-openai-001`, `demo-apple-001`, and `demo-meta-001`.
 - **Live news ingestion:** Event Registry API is the official News MCP/news-source path for this project; live mode is opt-in via `--live`, and adverse query expansion is opt-in via `--expand-adverse-news`.
 - **Cost control:** default mode is mock/replay, live raw signals can be saved to JSONL, and replay runs use `news_queries: 0`.
 - **Loop A gate:** relevance filtering, configurable risk terms, local SPLADE-style weighted sparse features, local ONNX dense encoding with visible fallback warning, local TF-IDF/hash fallback, hybrid features, lightweight VAE reconstruction with baseline start point + stable snapshot time series, 80/20 fit/validation, PCA/statistical fallback, dynamic threshold, and stable-signal drop are implemented.
@@ -296,7 +296,7 @@ No open P0 items.
 
 ### P1
 
-No open P1 items.
+No open P1 items. The eight frontend portfolio cards now have Layer 1 profile/query configuration.
 
 ### P2 (Optional)
 
@@ -305,4 +305,3 @@ No open P1 items.
 3. Replace local SPLADE-style sparse features with true SPLADE if needed.
 4. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
 5. Add basic data-safety guardrails (for safety concerns).
-

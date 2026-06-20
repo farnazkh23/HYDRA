@@ -41,44 +41,129 @@
       "last_kyc_review": "2026-01-20"
     },
     {
-      "client_id": "demo-apple-001",
-      "legal_name": "Apple",
+      "client_id": "demo-amazon-001",
+      "legal_name": "Amazon",
       "jurisdiction": "US",
-      "baseline_business_model": "Consumer electronics, software platforms, digital services, and global device supply chains",
+      "baseline_business_model": "E-commerce marketplace, cloud infrastructure, logistics, digital advertising, and subscription services",
       "expected_activity": [
-        "iPhone, Mac, iPad, and wearable device sales",
-        "App Store and digital services revenue",
-        "software platform updates",
-        "global manufacturing and supplier operations"
+        "online marketplace and retail operations",
+        "AWS cloud infrastructure services",
+        "logistics and fulfillment network expansion",
+        "digital advertising and subscription services"
       ],
       "expected_keywords": [
-        "iPhone",
-        "Mac",
-        "App Store",
-        "services",
-        "supply chain"
+        "e-commerce",
+        "AWS",
+        "cloud",
+        "logistics",
+        "fulfillment"
       ],
       "expected_jurisdictions": [
         "US",
         "EU",
-        "CN"
+        "UK",
+        "IN"
       ],
-      "expected_monthly_volume_chf": 85000000,
-      "risk_appetite": "Medium public-profile consumer technology risk; low tolerance for antitrust, supply-chain, privacy, or governance drift.",
-      "expected_transaction_profile": "Large recurring consumer electronics, software services, supplier, cloud, and retail activity tied to known commercial counterparties.",
+      "expected_monthly_volume_chf": 120000000,
+      "risk_appetite": "Medium public-profile platform risk; low tolerance for antitrust, labor, data privacy, tax, or supply-chain drift.",
+      "expected_transaction_profile": "Large recurring marketplace, cloud, logistics, supplier, and advertising activity tied to known commercial counterparties.",
       "ownership_assumptions": [
-        "Tim Cook is treated as a key public person for media and governance context.",
-        "Unexpected offshore control, undisclosed beneficial ownership, or material supply-chain compliance drift is not expected in Layer 1 public signals."
+        "Jeff Bezos is treated as a key public person for media and governance context.",
+        "Unexpected offshore control or undisclosed beneficial ownership is not expected in Layer 1 public signals."
       ],
       "monitored_public_entities": [
-        "Apple",
-        "Tim Cook",
-        "App Store",
-        "iPhone"
+        "Amazon",
+        "Jeff Bezos",
+        "AWS",
+        "Amazon Web Services"
       ],
-      "website": "https://www.apple.com",
-      "domain": "apple.com",
+      "website": "https://www.amazon.com",
+      "domain": "amazon.com",
       "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-nvidia-001",
+      "legal_name": "NVIDIA",
+      "jurisdiction": "US",
+      "baseline_business_model": "AI accelerator chips, GPU platforms, data center systems, and enterprise AI software",
+      "expected_activity": [
+        "GPU and AI accelerator shipments",
+        "data center platform partnerships",
+        "enterprise AI software deployment",
+        "semiconductor supply chain expansion"
+      ],
+      "expected_keywords": [
+        "GPU",
+        "AI accelerator",
+        "data center",
+        "semiconductor",
+        "enterprise AI"
+      ],
+      "expected_jurisdictions": [
+        "US",
+        "EU",
+        "TW"
+      ],
+      "expected_monthly_volume_chf": 90000000,
+      "risk_appetite": "Medium public-profile semiconductor and AI infrastructure risk; low tolerance for export-control, supply-chain, market-abuse, or governance drift.",
+      "expected_transaction_profile": "Large recurring semiconductor, cloud, data center, enterprise software, and supply-chain activity tied to known technology counterparties.",
+      "ownership_assumptions": [
+        "Jensen Huang is treated as a key public person for media and governance context.",
+        "Unexpected offshore control, undisclosed beneficial ownership, or sanctioned supply-chain routing is not expected in Layer 1 public signals."
+      ],
+      "monitored_public_entities": [
+        "NVIDIA",
+        "Nvidia",
+        "Jensen Huang",
+        "CUDA",
+        "Blackwell"
+      ],
+      "website": "https://www.nvidia.com",
+      "domain": "nvidia.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-binance-001",
+      "legal_name": "Binance Holdings",
+      "jurisdiction": "KY",
+      "baseline_business_model": "Crypto exchange, digital asset custody, trading infrastructure, and blockchain ecosystem services",
+      "expected_activity": [
+        "crypto exchange trading activity",
+        "digital asset custody and wallet services",
+        "blockchain ecosystem partnerships",
+        "cross-border digital asset operations"
+      ],
+      "expected_keywords": [
+        "crypto exchange",
+        "digital asset",
+        "custody",
+        "blockchain",
+        "trading"
+      ],
+      "expected_jurisdictions": [
+        "KY",
+        "AE",
+        "EU",
+        "SG"
+      ],
+      "expected_monthly_volume_chf": 110000000,
+      "risk_appetite": "High digital-asset compliance risk; very low tolerance for AML, sanctions, enforcement, beneficial ownership, or offshore drift.",
+      "expected_transaction_profile": "Large crypto exchange, custody, liquidity, and digital asset services activity tied to known regulated counterparties.",
+      "ownership_assumptions": [
+        "Richard Teng is treated as a key public person for media and governance context.",
+        "Any unexpected offshore ownership, AML enforcement, or sanctions-related signal must be escalated."
+      ],
+      "monitored_public_entities": [
+        "Binance",
+        "Binance Holdings",
+        "Richard Teng",
+        "BNB"
+      ],
+      "website": "https://www.binance.com",
+      "domain": "binance.com",
+      "risk_rating": "high",
       "last_kyc_review": "2026-01-20"
     },
     {
@@ -123,172 +208,125 @@
       "last_kyc_review": "2026-01-20"
     },
     {
-      "client_id": "demo-ubs-001",
-      "legal_name": "UBS Group AG",
-      "jurisdiction": "CH",
-      "baseline_business_model": "Global wealth management, investment banking, asset management, and Swiss retail banking",
+      "client_id": "demo-openai-001",
+      "legal_name": "OpenAI",
+      "jurisdiction": "US",
+      "baseline_business_model": "Artificial intelligence research, model deployment, enterprise AI products, and API platform services",
       "expected_activity": [
-        "private wealth management and advisory",
-        "investment banking and capital markets",
-        "asset management and fund operations",
-        "Swiss retail and corporate banking"
+        "AI model research and deployment",
+        "enterprise AI product subscriptions",
+        "API platform usage and developer services",
+        "cloud compute and AI infrastructure partnerships"
       ],
       "expected_keywords": [
-        "wealth management",
-        "investment banking",
-        "asset management",
-        "capital markets",
-        "Credit Suisse integration"
+        "AI model",
+        "API",
+        "ChatGPT",
+        "enterprise AI",
+        "research"
       ],
       "expected_jurisdictions": [
-        "CH",
         "US",
-        "UK",
         "EU",
-        "SG"
+        "UK"
       ],
-      "expected_monthly_volume_chf": 200000000,
-      "risk_appetite": "Low tolerance for regulatory, sanctions, tax evasion, or governance drift given FINMA oversight and Credit Suisse acquisition integration risk.",
-      "expected_transaction_profile": "Large recurring wealth management, institutional, and investment banking activity with known global counterparties and FINMA-regulated flows.",
+      "expected_monthly_volume_chf": 65000000,
+      "risk_appetite": "Medium emerging-technology risk; low tolerance for model safety, data privacy, governance, security, or misinformation drift.",
+      "expected_transaction_profile": "Recurring AI software, API, cloud infrastructure, enterprise subscription, and research partnership activity tied to known counterparties.",
       "ownership_assumptions": [
-        "Sergio Ermotti is treated as a key public person for media and governance context.",
-        "Credit Suisse integration activities are expected and should not trigger alerts without additional risk signals."
+        "Sam Altman is treated as a key public person for media and governance context.",
+        "Unexpected offshore control or undisclosed beneficial ownership is not expected in Layer 1 public signals."
       ],
       "monitored_public_entities": [
-        "UBS",
-        "Sergio Ermotti",
-        "Credit Suisse",
-        "UBS Group"
+        "OpenAI",
+        "Sam Altman",
+        "ChatGPT",
+        "GPT"
       ],
-      "website": "https://www.ubs.com",
-      "domain": "ubs.com",
+      "website": "https://openai.com",
+      "domain": "openai.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
     },
     {
-      "client_id": "demo-novartis-001",
-      "legal_name": "Novartis AG",
-      "jurisdiction": "CH",
-      "baseline_business_model": "Pharmaceutical research, drug development, manufacturing, and global medicine distribution",
+      "client_id": "demo-apple-001",
+      "legal_name": "Apple",
+      "jurisdiction": "US",
+      "baseline_business_model": "Consumer electronics, software platforms, digital services, and global device supply chains",
       "expected_activity": [
-        "clinical drug development and trials",
-        "pharmaceutical manufacturing and supply",
-        "medicine licensing and distribution",
-        "R&D partnerships and acquisitions"
+        "iPhone, Mac, iPad, and wearable device sales",
+        "App Store and digital services revenue",
+        "software platform updates",
+        "global manufacturing and supplier operations"
       ],
       "expected_keywords": [
-        "pharmaceutical",
-        "drug",
-        "clinical trial",
-        "medicine",
-        "R&D"
+        "iPhone",
+        "Mac",
+        "App Store",
+        "services",
+        "supply chain"
       ],
       "expected_jurisdictions": [
-        "CH",
         "US",
         "EU",
-        "IN",
         "CN"
       ],
-      "expected_monthly_volume_chf": 120000000,
-      "risk_appetite": "Medium; low tolerance for bribery, price-fixing, regulatory, or supply-chain compliance drift.",
-      "expected_transaction_profile": "Large recurring pharmaceutical, clinical, manufacturing, licensing, and distribution activity with known healthcare and government counterparties.",
+      "expected_monthly_volume_chf": 85000000,
+      "risk_appetite": "Medium public-profile consumer technology risk; low tolerance for antitrust, supply-chain, privacy, or governance drift.",
+      "expected_transaction_profile": "Large recurring consumer electronics, software services, supplier, cloud, and retail activity tied to known commercial counterparties.",
       "ownership_assumptions": [
-        "Vas Narasimhan is treated as a key public person for media and governance context.",
-        "No unexpected offshore control or undisclosed beneficial ownership is expected."
+        "Tim Cook is treated as a key public person for media and governance context.",
+        "Unexpected offshore control, undisclosed beneficial ownership, or material supply-chain compliance drift is not expected in Layer 1 public signals."
       ],
       "monitored_public_entities": [
-        "Novartis",
-        "Vas Narasimhan",
-        "Sandoz"
+        "Apple",
+        "Tim Cook",
+        "App Store",
+        "iPhone"
       ],
-      "website": "https://www.novartis.com",
-      "domain": "novartis.com",
+      "website": "https://www.apple.com",
+      "domain": "apple.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
     },
     {
-      "client_id": "demo-glencore-001",
-      "legal_name": "Glencore PLC",
-      "jurisdiction": "CH",
-      "baseline_business_model": "Global commodity trading, mining operations, and natural resource logistics",
+      "client_id": "demo-meta-001",
+      "legal_name": "Meta",
+      "jurisdiction": "US",
+      "baseline_business_model": "Social networking platforms, digital advertising, messaging products, VR hardware, and AI services",
       "expected_activity": [
-        "commodity trading in metals, energy, and agricultural products",
-        "mining and resource extraction operations",
-        "logistics and supply chain for raw materials",
-        "offtake agreements and commodity financing"
+        "social networking and messaging platform operations",
+        "digital advertising revenue",
+        "VR and metaverse product development",
+        "AI model and infrastructure investment"
       ],
       "expected_keywords": [
-        "commodity",
-        "mining",
-        "trading",
-        "copper",
-        "coal"
+        "Facebook",
+        "Instagram",
+        "advertising",
+        "VR",
+        "AI"
       ],
       "expected_jurisdictions": [
-        "CH",
-        "UK",
-        "AU",
-        "ZA",
-        "CD"
-      ],
-      "expected_monthly_volume_chf": 500000000,
-      "risk_appetite": "High-risk commodity trader; very low tolerance for bribery, corruption, sanctions, export control, or beneficial ownership drift given prior enforcement history.",
-      "expected_transaction_profile": "Very large recurring commodity trading, mining, logistics, and financing activity with known industrial and government counterparties.",
-      "ownership_assumptions": [
-        "Gary Nagle is treated as a key public person for media and governance context.",
-        "Given prior bribery enforcement history, any offshore or undisclosed ownership signals must be escalated immediately."
-      ],
-      "monitored_public_entities": [
-        "Glencore",
-        "Gary Nagle",
-        "Glencore International"
-      ],
-      "website": "https://www.glencore.com",
-      "domain": "glencore.com",
-      "risk_rating": "high",
-      "last_kyc_review": "2026-01-20"
-    },
-    {
-      "client_id": "demo-roche-001",
-      "legal_name": "Roche Holding AG",
-      "jurisdiction": "CH",
-      "baseline_business_model": "Pharmaceutical and diagnostics research, drug development, and global healthcare solutions",
-      "expected_activity": [
-        "oncology and immunology drug development",
-        "diagnostic equipment and testing solutions",
-        "clinical trials and regulatory approvals",
-        "global medicine distribution and licensing"
-      ],
-      "expected_keywords": [
-        "pharmaceutical",
-        "oncology",
-        "diagnostics",
-        "clinical trial",
-        "drug approval"
-      ],
-      "expected_jurisdictions": [
-        "CH",
         "US",
         "EU",
-        "JP",
-        "CN"
+        "UK"
       ],
-      "expected_monthly_volume_chf": 150000000,
-      "risk_appetite": "Medium; low tolerance for bribery, price-fixing, regulatory, or clinical data fraud drift.",
-      "expected_transaction_profile": "Large recurring pharmaceutical, diagnostics, clinical, licensing, and distribution activity with known healthcare and government counterparties.",
+      "expected_monthly_volume_chf": 70000000,
+      "risk_appetite": "Medium public-profile platform risk; low tolerance for privacy, content safety, antitrust, governance, or election-integrity drift.",
+      "expected_transaction_profile": "Large recurring advertising, platform services, VR hardware, cloud infrastructure, and AI investment activity tied to known counterparties.",
       "ownership_assumptions": [
-        "Thomas Schinecker is treated as a key public person for media and governance context.",
-        "Hoffmann family and Oeri family are known major shareholders \u2014 no unexpected offshore control expected."
+        "Mark Zuckerberg is treated as a key public person for media and governance context.",
+        "Unexpected offshore control or undisclosed beneficial ownership is not expected in Layer 1 public signals."
       ],
       "monitored_public_entities": [
-        "Roche",
-        "Thomas Schinecker",
-        "Genentech",
-        "Roche Holding"
+        "Meta",
+        "Mark Zuckerberg",
+        "Facebook",
+        "Instagram"
       ],
-      "website": "https://www.roche.com",
-      "domain": "roche.com",
+      "website": "https://www.meta.com",
+      "domain": "meta.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
     }

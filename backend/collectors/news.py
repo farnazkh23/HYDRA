@@ -273,10 +273,35 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
 
 def _mock_expected_anchor(company_name: str) -> dict[str, str]:
     normalized = company_name.lower()
+    if "amazon" in normalized:
+        return {
+            "title": "AWS and fulfillment network",
+            "summary": "The company announced additional AWS cloud capacity and logistics fulfillment improvements.",
+        }
+    if "nvidia" in normalized:
+        return {
+            "title": "data center GPU platform",
+            "summary": "The company announced additional AI accelerator capacity and enterprise data center platform partnerships.",
+        }
+    if "binance" in normalized:
+        return {
+            "title": "digital asset custody",
+            "summary": "The company announced additional crypto exchange custody and blockchain ecosystem services.",
+        }
+    if "openai" in normalized:
+        return {
+            "title": "enterprise AI platform",
+            "summary": "The company announced additional AI model API capacity and enterprise AI product availability.",
+        }
     if "apple" in normalized:
         return {
             "title": "services and device supply chain",
             "summary": "The company announced additional App Store services capacity and device supply chain improvements.",
+        }
+    if "meta" in normalized:
+        return {
+            "title": "advertising and AI infrastructure",
+            "summary": "The company announced additional digital advertising infrastructure and AI platform investment.",
         }
     if "tesla" in normalized:
         return {
@@ -291,16 +316,37 @@ def _mock_expected_anchor(company_name: str) -> dict[str, str]:
 
 def _mock_risk_anchor(company_name: str) -> str:
     normalized = company_name.lower()
+    if "amazon" in normalized:
+        return "logistics-supplier"
+    if "nvidia" in normalized:
+        return "chip-supply"
+    if "binance" in normalized:
+        return "custody"
+    if "openai" in normalized:
+        return "compute-infrastructure"
     if "apple" in normalized:
         return "supply-chain"
+    if "meta" in normalized:
+        return "data-sharing"
     if "tesla" in normalized:
         return "battery-supply"
     return "launch-services"
 
 
 def _mock_key_person(company_name: str) -> str:
-    if "apple" in company_name.lower():
+    normalized = company_name.lower()
+    if "amazon" in normalized:
+        return "Jeff Bezos"
+    if "nvidia" in normalized:
+        return "Jensen Huang"
+    if "binance" in normalized:
+        return "Richard Teng"
+    if "openai" in normalized:
+        return "Sam Altman"
+    if "apple" in normalized:
         return "Tim Cook"
+    if "meta" in normalized:
+        return "Mark Zuckerberg"
     return "Elon Musk"
 
 
