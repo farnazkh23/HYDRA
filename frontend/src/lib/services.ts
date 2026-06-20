@@ -135,3 +135,14 @@ export async function getAlertReport(alertId: string) {
   if (MODE === "mock") return mockOk(null);
   return apiFetch(`/api/alerts/${alertId}/report`);
 }
+
+export async function getKGTriples(customerId: string) {
+  if (MODE === "mock") return mockOk([]);
+  try {
+    return await apiFetch<Array<{ subject: string; predicate: string; object: string; start_time: string }>>(
+      `/api/customers/${customerId}/kg-triples`,
+    );
+  } catch {
+    return [];
+  }
+}

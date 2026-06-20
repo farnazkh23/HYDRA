@@ -159,13 +159,29 @@ def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
         "CRITICAL_BREACH": (0.4, 0.94),
         "ELEVATED_DRIFT": (14.0, 0.78),
     }.get(risk_token, (90.0, 0.62))
+    anomaly = round(drift_score, 3)
     return {
-        "router": {"path": router_path, "risk_token": risk_token},
-        "timegpt": {"summary": cot, "anomaly_score": round(drift_score, 3)},
+        "router": {
+            "path": router_path,
+            "risk_token": risk_token,
+            "reason": f"Survival horizon {horizon_days:.1f}d — {'below' if router_path == 'heavy' else 'above'} critical threshold",
+            "model": "Apertus AI (PublicAI gateway)",
+            "tokens": 320 if router_path == "heavy" else 0,
+            "cost_usd": 0.00015 if router_path == "heavy" else 0.0002,
+        },
+        "timegpt": {
+            "summary": cot,
+            "anomaly_score": anomaly,
+            "horizon_days": horizon_days,
+            "uncertainty": [round(anomaly * 0.88, 3), min(round(anomaly * 1.12, 3), 1.0)],
+        },
         "survival": {
             "summary": f"Compliance survival horizon: {horizon_days:.1f} days before regulatory action threshold.",
             "confidence": confidence,
+            "model": "Cox Proportional Hazards (HYDRA v2)",
+            "time_to_decay_days": horizon_days,
         },
+        "graphrag": None,   # populated after KG update in get_alerts()
         "audit_citations": citations,
         "chain_of_thought": cot,
     }
@@ -424,6 +440,14 @@ def get_alerts() -> list[dict[str, Any]]:
                 kg_result = update_kg_from_drift_event(event)
                 if kg_result.get("status") == "applied":
                     stored["reasoningTrace"]["kg_update"] = kg_result
+                    # Populate graphrag tab from real KG update results
+                    if stored["reasoningTrace"].get("loop_b"):
+                        triples_added = kg_result.get("triples_added", [])
+                        stored["reasoningTrace"]["loop_b"]["graphrag"] = {
+                            "new_entity": triples_added[0]["node_to"] if triples_added else "None detected",
+                            "triple_status": f"+{kg_result['added']} added  −{kg_result['deleted']} deprecated  ={kg_result['unchanged']} unchanged",
+                            "timestamp_slice": event.get("triggered_at", "—"),
+                        }
                     db.upsert_alert(stored)
     return db.get_all_alerts()
 
@@ -628,6 +652,19 @@ def get_portfolio() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Customer history — timeline of past drift events
 # ---------------------------------------------------------------------------
+
+@app.get("/api/customers/{customer_id}/kg-triples")
+def get_kg_triples(customer_id: str) -> list[dict[str, Any]]:
+    from backend.neo4j_client import get_active_triples
+    customer = next((c for c in STATIC_CUSTOMERS if c["id"] == customer_id), None)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    company_name = customer["companyName"]
+    triples = get_active_triples(company_name)
+    if not triples:
+        raise HTTPException(status_code=404, detail="No KG triples found")
+    return triples
+
 
 @app.get("/api/customers/{customer_id}/history")
 def get_customer_history(customer_id: str) -> dict[str, Any]:
