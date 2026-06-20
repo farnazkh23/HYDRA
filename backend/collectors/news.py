@@ -218,32 +218,35 @@ async def collect(client: KYCProfile, days_back: int = 7) -> list[RawSignal]:
 
 def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
     now = datetime.now(timezone.utc)
+    expected_anchor = _mock_expected_anchor(company_name)
+    risk_anchor = _mock_risk_anchor(company_name)
+    key_person = _mock_key_person(company_name)
     samples = [
         {
-            "title": f"{company_name} expands Starlink satellite service capacity",
-            "summary": "The company announced additional launch capacity and satellite internet coverage improvements.",
-            "url": "mock://news/spacex-starlink-expansion",
-            "related_entities": ["Elon Musk"],
-            "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
+            "title": f"{company_name} expands {expected_anchor['title']} capacity",
+            "summary": expected_anchor["summary"],
+            "url": f"mock://news/{client_id}-stable-expansion",
+            "related_entities": [key_person],
+            "entity_roles": {key_person: "beneficial_owner_or_key_person"},
             "sentiment_score": 0.2,
         },
         {
-            "title": f"{company_name} faces regulatory investigation over offshore launch-services partnership",
-            "summary": f"Reports say {company_name} and Elon Musk are under review after a proposed partnership with Orbital Ventures Ltd raised export control and governance questions.",
-            "url": "mock://news/spacex-offshore-investigation",
-            "related_entities": ["Elon Musk", "Orbital Ventures Ltd"],
+            "title": f"{company_name} faces regulatory investigation over offshore {risk_anchor} partnership",
+            "summary": f"Reports say {company_name} and {key_person} are under review after a proposed partnership with Orbital Ventures Ltd raised export control and governance questions.",
+            "url": f"mock://news/{client_id}-offshore-investigation",
+            "related_entities": [key_person, "Orbital Ventures Ltd"],
             "entity_roles": {
-                "Elon Musk": "beneficial_owner_or_key_person",
+                key_person: "beneficial_owner_or_key_person",
                 "Orbital Ventures Ltd": "partner_or_counterparty",
             },
             "sentiment_score": -0.7,
         },
         {
-            "title": f"Governance lawsuit names Elon Musk in dispute linked to {company_name} financing",
+            "title": f"Governance lawsuit names {key_person} in dispute linked to {company_name} financing",
             "summary": f"A shareholder lawsuit alleges governance concerns around related-party financing and {company_name} board oversight.",
-            "url": "mock://news/spacex-governance-lawsuit",
-            "related_entities": ["Elon Musk"],
-            "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
+            "url": f"mock://news/{client_id}-governance-lawsuit",
+            "related_entities": [key_person],
+            "entity_roles": {key_person: "beneficial_owner_or_key_person"},
             "sentiment_score": -0.45,
         },
     ]
@@ -266,6 +269,39 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
                 "sentiment_score": sample.get("sentiment_score"),
             },
         )
+
+
+def _mock_expected_anchor(company_name: str) -> dict[str, str]:
+    normalized = company_name.lower()
+    if "apple" in normalized:
+        return {
+            "title": "services and device supply chain",
+            "summary": "The company announced additional App Store services capacity and device supply chain improvements.",
+        }
+    if "tesla" in normalized:
+        return {
+            "title": "charging network",
+            "summary": "The company announced additional electric vehicle charging capacity and battery storage deployment.",
+        }
+    return {
+        "title": "Starlink satellite service",
+        "summary": "The company announced additional launch capacity and satellite internet coverage improvements.",
+    }
+
+
+def _mock_risk_anchor(company_name: str) -> str:
+    normalized = company_name.lower()
+    if "apple" in normalized:
+        return "supply-chain"
+    if "tesla" in normalized:
+        return "battery-supply"
+    return "launch-services"
+
+
+def _mock_key_person(company_name: str) -> str:
+    if "apple" in company_name.lower():
+        return "Tim Cook"
+    return "Elon Musk"
 
 
 def _article_payload_to_signals(

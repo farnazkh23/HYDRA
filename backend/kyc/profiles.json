@@ -18,21 +18,6 @@
         "aerospace",
         "space transportation"
       ],
-      "high_risk_keywords": [
-        "investigation",
-        "export control",
-        "national security",
-        "regulatory action",
-        "regulatory exposure",
-        "export compliance exposure",
-        "beneficial owner",
-        "offshore",
-        "fraud",
-        "lawsuit",
-        "governance",
-        "crypto",
-        "market manipulation"
-      ],
       "expected_jurisdictions": [
         "US",
         "EU",
@@ -52,6 +37,88 @@
       ],
       "website": "https://www.spacex.com",
       "domain": "spacex.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-apple-001",
+      "legal_name": "Apple",
+      "jurisdiction": "US",
+      "baseline_business_model": "Consumer electronics, software platforms, digital services, and global device supply chains",
+      "expected_activity": [
+        "iPhone, Mac, iPad, and wearable device sales",
+        "App Store and digital services revenue",
+        "software platform updates",
+        "global manufacturing and supplier operations"
+      ],
+      "expected_keywords": [
+        "iPhone",
+        "Mac",
+        "App Store",
+        "services",
+        "supply chain"
+      ],
+      "expected_jurisdictions": [
+        "US",
+        "EU",
+        "CN"
+      ],
+      "expected_monthly_volume_chf": 85000000,
+      "risk_appetite": "Medium public-profile consumer technology risk; low tolerance for antitrust, supply-chain, privacy, or governance drift.",
+      "expected_transaction_profile": "Large recurring consumer electronics, software services, supplier, cloud, and retail activity tied to known commercial counterparties.",
+      "ownership_assumptions": [
+        "Tim Cook is treated as a key public person for media and governance context.",
+        "Unexpected offshore control, undisclosed beneficial ownership, or material supply-chain compliance drift is not expected in Layer 1 public signals."
+      ],
+      "monitored_public_entities": [
+        "Apple",
+        "Tim Cook",
+        "App Store",
+        "iPhone"
+      ],
+      "website": "https://www.apple.com",
+      "domain": "apple.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-tesla-001",
+      "legal_name": "Tesla",
+      "jurisdiction": "US",
+      "baseline_business_model": "Electric vehicles, battery energy storage, charging infrastructure, and automotive software",
+      "expected_activity": [
+        "electric vehicle manufacturing",
+        "battery and energy storage deployment",
+        "charging network expansion",
+        "automotive software updates"
+      ],
+      "expected_keywords": [
+        "electric vehicle",
+        "battery",
+        "charging",
+        "vehicle production",
+        "software update"
+      ],
+      "expected_jurisdictions": [
+        "US",
+        "EU",
+        "CN"
+      ],
+      "expected_monthly_volume_chf": 75000000,
+      "risk_appetite": "Medium public-profile technology and automotive risk; low tolerance for safety, recall, labor, or governance drift.",
+      "expected_transaction_profile": "Large recurring automotive, energy, supplier, charging infrastructure, and software service activity tied to known commercial counterparties.",
+      "ownership_assumptions": [
+        "Elon Musk is treated as a key public person for media and governance context.",
+        "Unexpected offshore control or undisclosed beneficial ownership is not expected in Layer 1 public signals."
+      ],
+      "monitored_public_entities": [
+        "Tesla",
+        "Elon Musk",
+        "Tesla Energy",
+        "Supercharger"
+      ],
+      "website": "https://www.tesla.com",
+      "domain": "tesla.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
     }

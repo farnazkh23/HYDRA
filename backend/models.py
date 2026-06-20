@@ -170,7 +170,7 @@ class RawSignal(BaseModel):
     entity_name: str
     client_id: str
     signal_type: SignalType
-    source: str                                # e.g. "NewsAPI", "OpenSanctions"
+    source: str                                # e.g. "event_registry/Reuters", "mock_news"
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -183,7 +183,7 @@ class Layer1KycBaseline(BaseModel):
     baseline_business_model: str
     expected_activity: list[str] = Field(default_factory=list)
     expected_keywords: list[str]
-    high_risk_keywords: list[str]
+    high_risk_keywords: list[str] = Field(default_factory=list)
     expected_jurisdictions: list[str]
     expected_monthly_volume_chf: int
     risk_appetite: str = ""

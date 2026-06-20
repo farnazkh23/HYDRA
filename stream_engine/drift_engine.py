@@ -9,6 +9,7 @@ from pathlib import Path
 from stream_engine.reconstruction import build_default_reconstruction_engine, build_reconstruction_feature_vector
 from stream_engine.relationship_context import extract_relationship_context
 from stream_engine.scoring_config import Layer1ScoringConfig, load_layer1_scoring_config
+from stream_engine.source_quality import score_source_quality
 from stream_engine.vectorizer import (
     HybridSignalVectorizer,
     SparseSignalVectorizer,
@@ -52,6 +53,7 @@ class KeywordDriftEngine:
         entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
         sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
         adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
+        source_quality = score_source_quality(signal)
         heuristic_score = round(
             min(1.0, risk_term_score + baseline_mismatch_score + entity_score + adverse_sentiment_score),
             3,
@@ -77,8 +79,9 @@ class KeywordDriftEngine:
             "heuristic_score": heuristic_score,
             "reconstruction_error": reconstruction_result.reconstruction_error,
             "dynamic_threshold": reconstruction_result.drift_threshold,
-            "source_recency_score": 0.0,
-            "source_reliability_score": 0.0,
+            "source_recency_score": source_quality.recency_score,
+            "source_reliability_score": source_quality.reliability_score,
+            "signal_type_score": source_quality.signal_type_score,
         }
 
         if not reconstruction_result.drift_detected:
@@ -174,6 +177,9 @@ class KeywordDriftEngine:
                 "entity_name": signal.entity_name,
                 "sentiment_score": sentiment_value,
                 "relevance_matched_terms": relevance.matched_terms,
+                "source_recency_score": source_quality.recency_score,
+                "source_reliability_score": source_quality.reliability_score,
+                "signal_type_score": source_quality.signal_type_score,
                 **relationship_context,
             },
             layer1_cost_units={
