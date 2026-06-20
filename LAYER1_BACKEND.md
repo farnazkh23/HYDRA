@@ -195,7 +195,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 ## Current MVP Coverage
 
-- **Live news ingestion:** Event Registry API works with opt-in `--live`; adverse query expansion is opt-in via `--expand-adverse-news`.
+- **Live news ingestion:** Event Registry API is the official News MCP/news-source path for this project; live mode is opt-in via `--live`, and adverse query expansion is opt-in via `--expand-adverse-news`.
 - **Cost control:** default mode is mock/replay, live raw signals can be saved to JSONL, and replay runs use `news_queries: 0`.
 - **Loop A gate:** relevance filtering, sparse/dense/hybrid local features, VAE-compatible reconstruction proxy, dynamic threshold, and stable-signal drop are implemented.
 - **Layer 2 contract:** emitted `DRIFT_EVENT` payloads include citations, scoring breakdown, `loop_a_trace`, relationship hints, and stable schema fields.
@@ -215,7 +215,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 ### P0
 
-1. **To check:** confirm whether the official “News MCP” is a separate MCP server/tool or whether the provided Event Registry API key counts as the News MCP/news-source integration. If Event Registry API is accepted, Layer 1 P0 is complete.
+No open P0 items.
 
 ### P1
 
@@ -223,12 +223,12 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 2. Replace local hashing dense features with a local ONNX transformer or approved free local model while keeping the existing `loop_a_trace.dense_encoder` contract.
 3. Replace the VAE-compatible statistical proxy with a fitted lightweight VAE and learned dynamic threshold.
 4. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
+5. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
 
 ### P2
 
-1. Add a small latency/throughput benchmark for Loop A filtering.
-2. Add source recency, source reliability, and signal type scoring.
-3. Add full audit logging for accepted and dropped signals beyond the current CLI/replay drop reasons.
-4. Move high-risk terms into config so risk teammates can tune them without editing client profiles.
-5. Add basic data-safety guardrails to avoid leaking unnecessary internal baseline details downstream.
-6. Add multi-client runner only if the demo needs portfolio-level monitoring.
+1. Add source recency, source reliability, and signal type scoring.
+2. Add full audit logging for accepted and dropped signals beyond the current CLI/replay drop reasons.
+3. Move high-risk terms into config so risk teammates can tune them without editing client profiles.
+4. Add basic data-safety guardrails to avoid leaking unnecessary internal baseline details downstream.
+5. Add multi-client runner only if the demo needs portfolio-level monitoring.
