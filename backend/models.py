@@ -181,10 +181,17 @@ class Layer1KycBaseline(BaseModel):
     legal_name: str
     jurisdiction: str
     baseline_business_model: str
+    expected_activity: list[str] = Field(default_factory=list)
     expected_keywords: list[str]
     high_risk_keywords: list[str]
     expected_jurisdictions: list[str]
     expected_monthly_volume_chf: int
+    risk_appetite: str = ""
+    expected_transaction_profile: str = ""
+    ownership_assumptions: list[str] = Field(default_factory=list)
+    monitored_public_entities: list[str] = Field(default_factory=list)
+    website: str = ""
+    domain: str = ""
     risk_rating: str
     last_kyc_review: str
 
@@ -205,6 +212,7 @@ class DriftEvent(BaseModel):
     rationale: str
     recommended_action: str
     citations: list[dict[str, str]]
+    loop_a_trace: dict[str, Any] = Field(default_factory=dict)
     source_metadata: dict[str, Any] = Field(default_factory=dict)
     layer1_cost_units: dict[str, float]
 

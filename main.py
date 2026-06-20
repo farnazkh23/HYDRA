@@ -5,11 +5,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from backend.collectors.news import EventRegistryNewsCollector
+from backend.collectors.news import EventRegistryNewsCollector, dedupe_signals
 from backend.kyc.store import load_layer1_baselines
 from backend.models import Layer1KycBaseline, RawSignal
 from backend.replay import load_raw_signals, model_to_json_dict, write_jsonl, write_raw_signals
 from stream_engine.drift_engine import KeywordDriftEngine
+from stream_engine.relevance import evaluate_relevance
 
 
 DEFAULT_REPLAY_DIR = Path("data/layer1_replay")
@@ -31,15 +32,18 @@ def run_layer1_pipeline(
     limit: int,
     live: bool = False,
     replay_file: str | None = None,
+    expand_adverse_news: bool = False,
 ) -> dict[str, Any]:
     baselines = load_layer1_baselines()
     baseline = baselines[client_id]
-    signals = _load_or_collect_signals(
+    signals, news_queries = _load_or_collect_signals(
         baseline=baseline,
         limit=limit,
         live=live,
         replay_file=replay_file,
+        expand_adverse_news=expand_adverse_news,
     )
+    signals = dedupe_signals(signals)
     drift_engine = KeywordDriftEngine()
 
     events = []
@@ -58,7 +62,7 @@ def run_layer1_pipeline(
                     else str(signal.signal_type),
                     "source": signal.source,
                     "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
-                    "drop_reason": "stable_below_drift_threshold",
+                    "drop_reason": _drop_reason(baseline, signal),
                     "timestamp": signal.timestamp.isoformat(),
                 }
             )
@@ -73,6 +77,7 @@ def run_layer1_pipeline(
             dropped_signals=dropped_signals,
             live=live,
             replay_file=replay_file,
+            news_queries=news_queries,
         ),
     }
 
@@ -82,16 +87,28 @@ def _load_or_collect_signals(
     limit: int,
     live: bool,
     replay_file: str | None,
-) -> list[RawSignal]:
+    expand_adverse_news: bool,
+) -> tuple[list[RawSignal], int]:
     if replay_file:
-        return load_raw_signals(replay_file, client_id=baseline.client_id)[:limit]
+        return load_raw_signals(replay_file, client_id=baseline.client_id)[:limit], 0
 
-    news_collector = EventRegistryNewsCollector(enabled=live)
-    return news_collector.fetch_company_news(
+    news_collector = EventRegistryNewsCollector(
+        enabled=live,
+        expand_adverse_queries=expand_adverse_news,
+    )
+    signals = news_collector.fetch_company_news(
         client_id=baseline.client_id,
         company_name=baseline.legal_name,
         limit=limit,
     )
+    return signals, news_collector.last_query_count if live else 1
+
+
+def _drop_reason(baseline: Layer1KycBaseline, signal: RawSignal) -> str:
+    relevance = evaluate_relevance(baseline, signal)
+    if not relevance.relevant:
+        return relevance.reason
+    return "stable_below_drift_threshold"
 
 
 def _write_replay_outputs(output_dir: str | Path, payload: dict[str, Any]) -> None:
@@ -109,11 +126,11 @@ def _build_layer1_metrics(
     dropped_signals: list[dict[str, Any]],
     live: bool,
     replay_file: str | None,
+    news_queries: int,
 ) -> dict[str, Any]:
     processed = len(signals)
     emitted = len(events)
     dropped = len(dropped_signals)
-    news_queries = 0 if replay_file else 1
     news_query_cost_units = LIVE_NEWS_QUERY_COST_UNITS if live and not replay_file else MOCK_NEWS_QUERY_COST_UNITS
     estimated_cost_units = news_queries * news_query_cost_units
     return {
@@ -143,6 +160,11 @@ def main() -> None:
     parser.add_argument("--client-id", default="demo-spacex-001")
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--live", action="store_true", help="Allow live Event Registry calls. Defaults to mock/replay only.")
+    parser.add_argument(
+        "--expand-adverse-news",
+        action="store_true",
+        help="In live mode, query additional adverse Event Registry searches for the same client.",
+    )
     parser.add_argument("--replay-file", help="Read RawSignal records from a JSONL replay file instead of collecting news.")
     parser.add_argument(
         "--write-replay-dir",
@@ -157,6 +179,7 @@ def main() -> None:
         limit=args.limit,
         live=args.live,
         replay_file=args.replay_file,
+        expand_adverse_news=args.expand_adverse_news,
     )
     if args.write_replay_dir:
         _write_replay_outputs(args.write_replay_dir, payload)

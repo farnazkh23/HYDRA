@@ -5,6 +5,12 @@
       "legal_name": "SpaceX",
       "jurisdiction": "US",
       "baseline_business_model": "Aerospace launch services, satellite internet infrastructure, and space transportation",
+      "expected_activity": [
+        "commercial satellite launches",
+        "Starlink satellite internet expansion",
+        "government and enterprise launch contracts",
+        "spacecraft development and operations"
+      ],
       "expected_keywords": [
         "launch",
         "satellite",
@@ -33,6 +39,19 @@
         "AU"
       ],
       "expected_monthly_volume_chf": 50000000,
+      "risk_appetite": "Medium public-profile technology risk; low tolerance for export-control, regulatory, governance, or offshore ownership drift.",
+      "expected_transaction_profile": "Large recurring aerospace, satellite, launch-services, supplier, and telecom infrastructure activity tied to known commercial and government counterparties.",
+      "ownership_assumptions": [
+        "Elon Musk is treated as a key public person for media and governance context.",
+        "No unexpected offshore beneficial ownership or undisclosed control structure is expected in Layer 1 public signals."
+      ],
+      "monitored_public_entities": [
+        "SpaceX",
+        "Elon Musk",
+        "Starlink"
+      ],
+      "website": "https://www.spacex.com",
+      "domain": "spacex.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
     }

@@ -13,10 +13,17 @@ from backend.models import KYCProfile, RawSignal, SignalType
 
 
 EVENT_REGISTRY_BASE = "https://eventregistry.org/api/v1"
+ADVERSE_QUERY_TERMS = [
+    "investigation",
+    "lawsuit",
+    "regulatory investigation",
+    "export control",
+    "governance",
+    "offshore",
+]
 
 ADVERSE_KEYWORDS = [
     "fraud",
-    "sanction",
     "investigation",
     "arrest",
     "money laundering",
@@ -44,38 +51,54 @@ ADVERSE_KEYWORDS = [
 class EventRegistryNewsCollector:
     """News collector that emits shared RawSignal objects for HYDRA Loop A."""
 
-    def __init__(self, api_key: str | None = None, enabled: bool | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        enabled: bool | None = None,
+        expand_adverse_queries: bool = False,
+    ) -> None:
         self.api_key = api_key or os.getenv("EVENT_REGISTRY_API_KEY")
         self.enabled = bool(self.api_key) if enabled is None else enabled
+        self.expand_adverse_queries = expand_adverse_queries
+        self.last_query_count = 0
 
     def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10) -> list[RawSignal]:
         if not self.enabled:
+            self.last_query_count = 0
             return list(mock_company_news(client_id, company_name))[:limit]
 
-        params = urllib.parse.urlencode(
-            {
-                "apiKey": self.api_key,
-                "keyword": company_name,
-                "articlesSortBy": "date",
-                "articlesCount": limit,
-                "resultType": "articles",
-                "lang": "eng",
-            }
-        )
-        url = f"{EVENT_REGISTRY_BASE}/article/getArticles?{params}"
-        try:
-            with urllib.request.urlopen(url, timeout=8) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except Exception:
-            return list(mock_company_news(client_id, company_name))[:limit]
+        signals: list[RawSignal] = []
+        self.last_query_count = 0
+        for query in _expanded_news_queries(company_name, self.expand_adverse_queries):
+            params = urllib.parse.urlencode(
+                {
+                    "apiKey": self.api_key,
+                    "keyword": query,
+                    "articlesSortBy": "date",
+                    "articlesCount": limit,
+                    "resultType": "articles",
+                    "lang": "eng",
+                }
+            )
+            url = f"{EVENT_REGISTRY_BASE}/article/getArticles?{params}"
+            try:
+                with urllib.request.urlopen(url, timeout=8) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except Exception:
+                return list(mock_company_news(client_id, company_name))[:limit]
 
-        signals = _article_payload_to_signals(
-            payload=payload,
-            client_id=client_id,
-            company_name=company_name,
-            fallback_url=url,
-            adverse_only=False,
-        )
+            self.last_query_count += 1
+            signals.extend(
+                _article_payload_to_signals(
+                    payload=payload,
+                    client_id=client_id,
+                    company_name=company_name,
+                    fallback_url=url,
+                    adverse_only=query != company_name,
+                    query=query,
+                )
+            )
+        signals = dedupe_signals(signals)
         return signals or list(mock_company_news(client_id, company_name))[:limit]
 
 
@@ -252,6 +275,7 @@ def _article_payload_to_signals(
     fallback_url: str,
     adverse_only: bool,
     date_range: str | None = None,
+    query: str | None = None,
 ) -> list[RawSignal]:
     signals: list[RawSignal] = []
     for article in payload.get("articles", {}).get("results", []):
@@ -280,11 +304,32 @@ def _article_payload_to_signals(
                     "published_at": published_at,
                     "sentiment_score": sentiment,
                     "date_range": date_range,
+                    "query": query,
                     "provider": "event_registry",
                 },
             )
         )
     return signals
+
+
+def _expanded_news_queries(company_name: str, expand_adverse_queries: bool) -> list[str]:
+    if not expand_adverse_queries:
+        return [company_name]
+    return [company_name, *[f"{company_name} {term}" for term in ADVERSE_QUERY_TERMS]]
+
+
+def dedupe_signals(signals: list[RawSignal]) -> list[RawSignal]:
+    seen: set[str] = set()
+    deduped: list[RawSignal] = []
+    for signal in signals:
+        title = str(signal.metadata.get("title", "")).strip().lower()
+        url = str(signal.metadata.get("url", "")).strip().lower()
+        keys = [key for key in (url, title) if key]
+        if not keys or any(key in seen for key in keys):
+            continue
+        seen.update(keys)
+        deduped.append(signal)
+    return deduped
 
 
 def _post_json(url: str, payload: dict) -> dict:

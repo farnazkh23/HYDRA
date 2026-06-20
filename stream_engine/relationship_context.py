@@ -8,7 +8,8 @@ from backend.models import RawSignal
 RELATIONSHIP_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("partnership", ("partner", "partnership", "collaboration", "alliance", "joint venture")),
     ("ownership", ("beneficial owner", "shareholder", "acquired", "acquisition", "ownership")),
-    ("regulatory_investigation", ("investigation", "regulator", "lawsuit", "indictment", "fine", "penalty")),
+    ("regulatory_investigation", ("investigation", "regulator", "indictment", "fine", "penalty")),
+    ("litigation", ("lawsuit", "legal challenge", "court filing")),
     ("offshore_link", ("offshore", "shell company", "jurisdiction move")),
     ("business_pivot", ("pivots", "pivot", "crypto exchange", "new business model")),
 )

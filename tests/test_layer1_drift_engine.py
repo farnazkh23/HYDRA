@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
 
 from backend.collectors.news import mock_company_news
 from backend.kyc.store import load_layer1_baselines
+from backend.models import RawSignal, SignalType
 from stream_engine.drift_engine import KeywordDriftEngine
 from stream_engine.scoring_config import (
     Layer1ScoringConfig,
@@ -25,6 +27,21 @@ class KeywordDriftEngineTests(unittest.TestCase):
 
         self.assertIsNone(event)
 
+    def test_irrelevant_risky_signal_is_dropped_before_scoring(self) -> None:
+        unrelated_signal = RawSignal(
+            entity_name="Unrelated Corp",
+            client_id=self.baseline.client_id,
+            signal_type=SignalType.NEWS,
+            source="unit_test",
+            content="Unrelated Corp faces fraud investigation over offshore governance concerns.",
+            timestamp=datetime.now(timezone.utc),
+            metadata={"title": "Unrelated Corp faces fraud investigation"},
+        )
+
+        event = self.engine.score_signal(self.baseline, unrelated_signal)
+
+        self.assertIsNone(event)
+
     def test_scoring_config_loads_thresholds_and_weights(self) -> None:
         scoring_config = load_layer1_scoring_config()
 
@@ -33,6 +50,13 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertEqual(scoring_config.thresholds.critical, 0.85)
         self.assertEqual(scoring_config.weights.risk_term, 0.18)
         self.assertEqual(scoring_config.weights.adverse_sentiment_cap, 0.12)
+
+    def test_spacex_baseline_has_nominal_behavior_context(self) -> None:
+        self.assertIn("Starlink", self.baseline.monitored_public_entities)
+        self.assertIn("Elon Musk", self.baseline.monitored_public_entities)
+        self.assertIn("commercial satellite launches", self.baseline.expected_activity)
+        self.assertEqual(self.baseline.domain, "spacex.com")
+        self.assertIn("export-control", self.baseline.risk_appetite)
 
     def test_custom_threshold_can_suppress_risky_signal(self) -> None:
         strict_config = Layer1ScoringConfig(
@@ -69,6 +93,65 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertIn("investigation", event.matched_risk_terms)
         self.assertEqual(event.scoring_breakdown["risk_term_score"], 0.72)
         self.assertEqual(event.scoring_breakdown["adverse_sentiment_score"], 0.084)
+        self.assertEqual(event.loop_a_trace["trace_mode"], "vae_compatible_proxy")
+        self.assertEqual(
+            event.loop_a_trace["reconstruction_engine"],
+            "vae_compatible_statistical_proxy",
+        )
+        self.assertEqual(event.loop_a_trace["vae_reconstruction_error"], 1.0)
+        self.assertEqual(event.loop_a_trace["drift_threshold"], 0.35)
+        self.assertIn("nominal_mean", event.loop_a_trace["nominal_profile"])
+        self.assertIn("dynamic_threshold", event.scoring_breakdown)
+        self.assertIn("reconstruction_error", event.scoring_breakdown)
+        self.assertEqual(event.scoring_breakdown["relevance_score"], 1.0)
+        self.assertTrue(event.loop_a_trace["drift_detected"])
+        self.assertEqual(event.loop_a_trace["relevance_gate"]["reason"], "matched_monitored_entity")
+        self.assertIn("SpaceX", event.loop_a_trace["relevance_gate"]["matched_terms"])
+        self.assertEqual(event.loop_a_trace["decision"], "DRIFT_EVENT emitted")
+        self.assertEqual(event.loop_a_trace["tokens_used"], 0)
+        self.assertIn("investigation", event.loop_a_trace["top_keywords_matched"])
+        self.assertEqual(
+            event.loop_a_trace["sparse_encoder"]["encoder"],
+            "local_exact_activation",
+        )
+        self.assertIn(
+            "risk::investigation",
+            event.loop_a_trace["sparse_encoder"]["activations"],
+        )
+        self.assertIn(
+            "entity::SpaceX",
+            event.loop_a_trace["sparse_encoder"]["activations"],
+        )
+        self.assertIn(
+            "Elon Musk",
+            event.loop_a_trace["sparse_encoder"]["matched_entities"],
+        )
+        self.assertEqual(
+            event.loop_a_trace["dense_encoder"]["encoder"],
+            "local_hashing_embedding",
+        )
+        self.assertEqual(event.loop_a_trace["dense_encoder"]["dimensions"], 32)
+        self.assertGreaterEqual(event.loop_a_trace["embedding_shift_score"], 0.0)
+        self.assertLessEqual(event.loop_a_trace["embedding_shift_score"], 1.0)
+        self.assertGreaterEqual(
+            event.scoring_breakdown["dense_semantic_shift_score"],
+            0.0,
+        )
+        self.assertLessEqual(
+            event.scoring_breakdown["dense_semantic_shift_score"],
+            1.0,
+        )
+        self.assertEqual(
+            event.loop_a_trace["hybrid_encoder"]["encoder"],
+            "local_sparse_dense_hybrid",
+        )
+        self.assertGreater(event.loop_a_trace["hybrid_encoder"]["hybrid_dimensions"], 32)
+        self.assertIn(
+            "semantic_hash",
+            event.loop_a_trace["hybrid_encoder"]["feature_families"],
+        )
+        self.assertGreaterEqual(event.scoring_breakdown["hybrid_shift_score"], 0.0)
+        self.assertLessEqual(event.scoring_breakdown["hybrid_shift_score"], 1.0)
         self.assertEqual(event.source_metadata["provider"], "mock")
         self.assertEqual(event.source_metadata["sentiment_score"], -0.7)
         self.assertIn("Elon Musk", event.source_metadata["related_entities"])
@@ -95,6 +178,16 @@ class KeywordDriftEngineTests(unittest.TestCase):
             event.source_metadata["entity_roles"]["Elon Musk"],
             "beneficial_owner_or_key_person",
         )
+
+    def test_lawsuit_signal_uses_litigation_relationship_hint(self) -> None:
+        lawsuit_signal = list(mock_company_news(self.baseline.client_id, self.baseline.legal_name))[2]
+
+        event = self.engine.score_signal(self.baseline, lawsuit_signal)
+
+        self.assertIsNotNone(event)
+        assert event is not None
+        self.assertIn("litigation", event.source_metadata["relationship_hints"])
+        self.assertNotIn("regulatory_investigation", event.source_metadata["relationship_hints"])
 
 
 if __name__ == "__main__":

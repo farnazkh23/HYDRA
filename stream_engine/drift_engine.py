@@ -3,8 +3,15 @@ from __future__ import annotations
 import hashlib
 
 from backend.models import DriftEvent, DriftSeverity, Layer1KycBaseline, RawSignal
+from stream_engine.relevance import evaluate_relevance
+from stream_engine.reconstruction import VAECompatibleReconstructionEngine
 from stream_engine.relationship_context import extract_relationship_context
 from stream_engine.scoring_config import Layer1ScoringConfig, load_layer1_scoring_config
+from stream_engine.vectorizer import (
+    HybridSignalVectorizer,
+    LocalHashingDenseVectorizer,
+    SparseSignalVectorizer,
+)
 
 
 class KeywordDriftEngine:
@@ -12,16 +19,24 @@ class KeywordDriftEngine:
 
     def __init__(self, scoring_config: Layer1ScoringConfig | None = None) -> None:
         self.scoring_config = scoring_config or load_layer1_scoring_config()
+        self.sparse_vectorizer = SparseSignalVectorizer()
+        self.dense_vectorizer = LocalHashingDenseVectorizer()
+        self.hybrid_vectorizer = HybridSignalVectorizer()
+        self.reconstruction_engine = VAECompatibleReconstructionEngine()
 
     def score_signal(self, baseline: Layer1KycBaseline, signal: RawSignal) -> DriftEvent | None:
         weights = self.scoring_config.weights
         thresholds = self.scoring_config.thresholds
+        relevance = evaluate_relevance(baseline, signal)
+        if not relevance.relevant:
+            return None
+
         text = signal.content.lower()
-        matched_risk_terms = [term for term in baseline.high_risk_keywords if term.lower() in text]
-        matched_expected_terms = [term for term in baseline.expected_keywords if term.lower() in text]
-        missing_baseline_terms = [
-            term for term in baseline.expected_keywords if term not in matched_expected_terms
-        ]
+        sparse_features = self.sparse_vectorizer.encode(baseline, signal)
+        dense_features = self.dense_vectorizer.encode(baseline, signal)
+        hybrid_features = self.hybrid_vectorizer.encode(sparse_features, dense_features)
+        matched_risk_terms = sparse_features.matched_risk_terms
+        missing_baseline_terms = sparse_features.missing_baseline_terms
 
         risk_term_score = min(weights.risk_term_cap, weights.risk_term * len(matched_risk_terms))
         baseline_mismatch_score = min(
@@ -31,20 +46,36 @@ class KeywordDriftEngine:
         entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
         sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
         adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
-        drift_score = round(
+        heuristic_score = round(
             min(1.0, risk_term_score + baseline_mismatch_score + entity_score + adverse_sentiment_score),
             3,
         )
+        reconstruction_result = self.reconstruction_engine.evaluate(
+            baseline=baseline,
+            sparse_features=sparse_features,
+            dense_features=dense_features,
+            hybrid_features=hybrid_features,
+            heuristic_score=heuristic_score,
+            threshold_floor=thresholds.emit_event,
+        )
+        drift_score = reconstruction_result.reconstruction_error
+        embedding_shift_score = dense_features.semantic_shift_score
         scoring_breakdown = {
             "risk_term_score": round(risk_term_score, 3),
             "baseline_mismatch_score": round(baseline_mismatch_score, 3),
             "entity_match_score": round(entity_score, 3),
+            "relevance_score": relevance.score,
             "adverse_sentiment_score": round(adverse_sentiment_score, 3),
+            "dense_semantic_shift_score": dense_features.semantic_shift_score,
+            "hybrid_shift_score": hybrid_features.hybrid_shift_score,
+            "heuristic_score": heuristic_score,
+            "reconstruction_error": reconstruction_result.reconstruction_error,
+            "dynamic_threshold": reconstruction_result.drift_threshold,
             "source_recency_score": 0.0,
             "source_reliability_score": 0.0,
         }
 
-        if drift_score < thresholds.emit_event:
+        if not reconstruction_result.drift_detected:
             return None
 
         severity = (
@@ -81,6 +112,51 @@ class KeywordDriftEngine:
                     "source": signal.source,
                 }
             ],
+            loop_a_trace={
+                "trace_mode": "vae_compatible_proxy",
+                "reconstruction_engine": reconstruction_result.engine,
+                "vae_reconstruction_error": reconstruction_result.reconstruction_error,
+                "drift_threshold": reconstruction_result.drift_threshold,
+                "dynamic_variance": reconstruction_result.dynamic_variance,
+                "drift_score": drift_score,
+                "drift_detected": reconstruction_result.drift_detected,
+                "relevance_gate": {
+                    "relevant": relevance.relevant,
+                    "score": relevance.score,
+                    "matched_terms": relevance.matched_terms,
+                    "reason": relevance.reason,
+                },
+                "top_keywords_matched": matched_risk_terms,
+                "embedding_shift_score": embedding_shift_score,
+                "decision": reconstruction_result.decision,
+                "tokens_used": 0,
+                "cost_usd": 0.0,
+                "nominal_profile": reconstruction_result.nominal_profile,
+                "sparse_encoder": {
+                    "encoder": "local_exact_activation",
+                    "activation_count": sparse_features.activation_count,
+                    "matched_entities": sparse_features.matched_entities,
+                    "activations": sparse_features.activations,
+                },
+                "dense_encoder": {
+                    "encoder": dense_features.encoder,
+                    "dimensions": dense_features.dimensions,
+                    "baseline_similarity": dense_features.baseline_similarity,
+                    "semantic_shift_score": dense_features.semantic_shift_score,
+                    "signal_norm": dense_features.signal_norm,
+                    "baseline_norm": dense_features.baseline_norm,
+                },
+                "hybrid_encoder": {
+                    "encoder": hybrid_features.encoder,
+                    "sparse_dimensions": hybrid_features.sparse_dimensions,
+                    "dense_dimensions": hybrid_features.dense_dimensions,
+                    "hybrid_dimensions": hybrid_features.hybrid_dimensions,
+                    "sparse_activation_ratio": hybrid_features.sparse_activation_ratio,
+                    "semantic_shift_score": hybrid_features.semantic_shift_score,
+                    "hybrid_shift_score": hybrid_features.hybrid_shift_score,
+                    "feature_families": hybrid_features.feature_families,
+                },
+            },
             source_metadata={
                 "raw_signal_id": str(signal.metadata.get("signal_id", "")),
                 "signal_type": signal.signal_type.value
@@ -90,6 +166,7 @@ class KeywordDriftEngine:
                 "provider": str(signal.metadata.get("provider", "")),
                 "entity_name": signal.entity_name,
                 "sentiment_score": sentiment_value,
+                "relevance_matched_terms": relevance.matched_terms,
                 **relationship_context,
             },
             layer1_cost_units={
