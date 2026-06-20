@@ -40,7 +40,11 @@ export async function getAlerts(): Promise<Alert[]> {
 
 export async function getAlertById(id: string) {
   if (MODE === "mock") return mockOk(alerts.find((a) => a.id === id));
-  return apiFetch(`/api/alerts/${id}`);
+  try {
+    return await apiFetch(`/api/alerts/${id}`);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getGraph(): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {

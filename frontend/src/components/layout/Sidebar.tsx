@@ -1,6 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, PieChart } from "lucide-react";
 import { HydraLogo } from "@/components/HydraLogo";
+import { getAlerts } from "@/lib/services";
 
 type NavItem = {
   to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/portfolio";
@@ -9,11 +11,11 @@ type NavItem = {
   exact?: boolean;
   badge?: number;
 };
-const nav: NavItem[] = [
+const navBase: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/portfolio", label: "Portfolio", icon: PieChart },
   { to: "/customers", label: "Customers", icon: Users },
-  { to: "/alerts", label: "Alerts", icon: Bell, badge: 3 },
+  { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/logs", label: "Logs", icon: Terminal },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -21,6 +23,18 @@ const nav: NavItem[] = [
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [alertCount, setAlertCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    getAlerts().then((a) => {
+      const open = a.filter((x) => x.status === "open").length;
+      setAlertCount(open > 0 ? open : null);
+    }).catch(() => {});
+  }, []);
+
+  const nav = navBase.map((item) =>
+    item.to === "/alerts" && alertCount ? { ...item, badge: alertCount } : item,
+  );
 
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur">

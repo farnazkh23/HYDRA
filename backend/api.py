@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+import os
 import sys
 import uuid
 import time
@@ -51,7 +52,8 @@ _pipeline_cache: dict[str, Any] = {}   # client_id → raw pipeline result
 
 def _get_pipeline(client_id: str = "demo-spacex-001") -> dict[str, Any]:
     if client_id not in _pipeline_cache:
-        result = run_layer1_pipeline(client_id=client_id, limit=10, live=False)
+        live = bool(os.environ.get("EVENT_REGISTRY_API_KEY"))
+        result = run_layer1_pipeline(client_id=client_id, limit=10, live=live)
         _pipeline_cache[client_id] = result
     return _pipeline_cache[client_id]
 
@@ -271,8 +273,12 @@ STATIC_CUSTOMERS: list[dict[str, Any]] = [
     {"id": "binance", "clientId": None, "companyName": "Binance Holdings", "legalName": "Binance Holdings Ltd.", "responsiblePerson": "Richard Teng", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Crypto Exchange", "country": "Cayman Islands", "onboardedDate": "Oct 02, 2024", "kycStatus": "Pending", "riskStatus": "high", "riskScore": 92, "driftPercent": 84, "driftSeverity": "critical", "lastUpdated": "4 min ago", "transactionVolume": "$3.1B", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
     {"id": "tesla", "clientId": None, "companyName": "Tesla", "legalName": "Tesla, Inc.", "responsiblePerson": "Elon Musk", "responsiblePersonRole": "CEO", "industry": "Automotive", "country": "United States", "onboardedDate": "Jul 14, 2020", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 52, "driftPercent": 42, "driftSeverity": "medium", "lastUpdated": "9 min ago", "transactionVolume": "$880M", "companyType": "Corporate", "trend": "up"},
     {"id": "openai", "clientId": None, "companyName": "OpenAI", "legalName": "OpenAI, L.L.C.", "responsiblePerson": "Sam Altman", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Artificial Intelligence", "country": "United States", "onboardedDate": "May 04, 2023", "kycStatus": "Verified", "riskStatus": "elevated", "riskScore": 73, "driftPercent": 57, "driftSeverity": "high", "lastUpdated": "6 min ago", "transactionVolume": "$310M", "companyType": "Corporate", "trend": "up"},
-    {"id": "apple", "clientId": None, "companyName": "Apple", "legalName": "Apple Inc.", "responsiblePerson": "Tim Cook", "responsiblePersonRole": "CEO", "industry": "Consumer Electronics", "country": "United States", "onboardedDate": "Feb 11, 2019", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 14, "driftPercent": 9, "driftSeverity": "low", "lastUpdated": "22 min ago", "transactionVolume": "$2.4B", "companyType": "Corporate", "trend": "flat"},
+    {"id": "apple", "clientId": "demo-apple-001", "companyName": "Apple", "legalName": "Apple Inc.", "responsiblePerson": "Tim Cook", "responsiblePersonRole": "CEO", "industry": "Consumer Electronics", "country": "United States", "onboardedDate": "Feb 11, 2019", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 14, "driftPercent": 9, "driftSeverity": "low", "lastUpdated": "22 min ago", "transactionVolume": "$2.4B", "companyType": "Corporate", "trend": "flat"},
     {"id": "meta", "clientId": None, "companyName": "Meta", "legalName": "Meta Platforms, Inc.", "responsiblePerson": "Mark Zuckerberg", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Social Media", "country": "United States", "onboardedDate": "Aug 22, 2021", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 49, "driftPercent": 36, "driftSeverity": "medium", "lastUpdated": "14 min ago", "transactionVolume": "$1.05B", "companyType": "Corporate", "trend": "down"},
+    {"id": "ubs", "clientId": "demo-ubs-001", "companyName": "UBS Group AG", "legalName": "UBS Group AG", "responsiblePerson": "Sergio Ermotti", "responsiblePersonRole": "Group CEO", "industry": "Banking", "country": "Switzerland", "onboardedDate": "Mar 15, 2023", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 12, "driftPercent": 8, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 2.1B", "companyType": "Corporate", "trend": "flat"},
+    {"id": "novartis", "clientId": "demo-novartis-001", "companyName": "Novartis AG", "legalName": "Novartis AG", "responsiblePerson": "Vas Narasimhan", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals", "country": "Switzerland", "onboardedDate": "Jan 10, 2021", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 18, "driftPercent": 11, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 980M", "companyType": "Corporate", "trend": "flat"},
+    {"id": "glencore", "clientId": "demo-glencore-001", "companyName": "Glencore PLC", "legalName": "Glencore PLC", "responsiblePerson": "Gary Nagle", "responsiblePersonRole": "CEO", "industry": "Commodity Trading", "country": "Switzerland", "onboardedDate": "Nov 03, 2022", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 61, "driftPercent": 44, "driftSeverity": "medium", "lastUpdated": "just now", "transactionVolume": "CHF 4.2B", "companyType": "Corporate", "trend": "up"},
+    {"id": "roche", "clientId": "demo-roche-001", "companyName": "Roche Holding AG", "legalName": "Roche Holding AG", "responsiblePerson": "Thomas Schinecker", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals & Diagnostics", "country": "Switzerland", "onboardedDate": "Jun 22, 2020", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 9, "driftPercent": 6, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 1.3B", "companyType": "Corporate", "trend": "flat"},
 ]
 
 STATIC_GRAPH: dict[str, Any] = {
@@ -351,15 +357,14 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    result = _get_pipeline("demo-spacex-001")
-    events = result.get("drift_events", [])
-    live_alerts = [_map_alert(e) for e in events]
-
-    # Store in DB so /action endpoint can update them
-    for alert in live_alerts:
-        db.upsert_alert(alert)
-
-    return live_alerts
+    all_alerts: list[dict[str, Any]] = []
+    for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001"):
+        result = _get_pipeline(client_id)
+        for event in result.get("drift_events", []):
+            mapped = _map_alert(event)
+            db.upsert_alert(mapped)
+            all_alerts.append(mapped)
+    return all_alerts
 
 
 @app.get("/api/alerts/{alert_id}")
@@ -459,8 +464,9 @@ def get_cost_summary() -> dict[str, Any]:
 def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     client_id = body.get("client_id", "demo-spacex-001")
     live = bool(body.get("live", False))
+    expand_adverse = bool(body.get("expand_adverse_news", False))
     _invalidate_cache(client_id)
-    result = run_layer1_pipeline(client_id=client_id, limit=10, live=live)
+    result = run_layer1_pipeline(client_id=client_id, limit=10, live=live, expand_adverse_news=expand_adverse)
     _pipeline_cache[client_id] = result
     alerts = [_map_alert(e) for e in result.get("drift_events", [])]
     for a in alerts:

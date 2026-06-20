@@ -121,6 +121,176 @@
       "domain": "tesla.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-ubs-001",
+      "legal_name": "UBS Group AG",
+      "jurisdiction": "CH",
+      "baseline_business_model": "Global wealth management, investment banking, asset management, and Swiss retail banking",
+      "expected_activity": [
+        "private wealth management and advisory",
+        "investment banking and capital markets",
+        "asset management and fund operations",
+        "Swiss retail and corporate banking"
+      ],
+      "expected_keywords": [
+        "wealth management",
+        "investment banking",
+        "asset management",
+        "capital markets",
+        "Credit Suisse integration"
+      ],
+      "expected_jurisdictions": [
+        "CH",
+        "US",
+        "UK",
+        "EU",
+        "SG"
+      ],
+      "expected_monthly_volume_chf": 200000000,
+      "risk_appetite": "Low tolerance for regulatory, sanctions, tax evasion, or governance drift given FINMA oversight and Credit Suisse acquisition integration risk.",
+      "expected_transaction_profile": "Large recurring wealth management, institutional, and investment banking activity with known global counterparties and FINMA-regulated flows.",
+      "ownership_assumptions": [
+        "Sergio Ermotti is treated as a key public person for media and governance context.",
+        "Credit Suisse integration activities are expected and should not trigger alerts without additional risk signals."
+      ],
+      "monitored_public_entities": [
+        "UBS",
+        "Sergio Ermotti",
+        "Credit Suisse",
+        "UBS Group"
+      ],
+      "website": "https://www.ubs.com",
+      "domain": "ubs.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-novartis-001",
+      "legal_name": "Novartis AG",
+      "jurisdiction": "CH",
+      "baseline_business_model": "Pharmaceutical research, drug development, manufacturing, and global medicine distribution",
+      "expected_activity": [
+        "clinical drug development and trials",
+        "pharmaceutical manufacturing and supply",
+        "medicine licensing and distribution",
+        "R&D partnerships and acquisitions"
+      ],
+      "expected_keywords": [
+        "pharmaceutical",
+        "drug",
+        "clinical trial",
+        "medicine",
+        "R&D"
+      ],
+      "expected_jurisdictions": [
+        "CH",
+        "US",
+        "EU",
+        "IN",
+        "CN"
+      ],
+      "expected_monthly_volume_chf": 120000000,
+      "risk_appetite": "Medium; low tolerance for bribery, price-fixing, regulatory, or supply-chain compliance drift.",
+      "expected_transaction_profile": "Large recurring pharmaceutical, clinical, manufacturing, licensing, and distribution activity with known healthcare and government counterparties.",
+      "ownership_assumptions": [
+        "Vas Narasimhan is treated as a key public person for media and governance context.",
+        "No unexpected offshore control or undisclosed beneficial ownership is expected."
+      ],
+      "monitored_public_entities": [
+        "Novartis",
+        "Vas Narasimhan",
+        "Sandoz"
+      ],
+      "website": "https://www.novartis.com",
+      "domain": "novartis.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-glencore-001",
+      "legal_name": "Glencore PLC",
+      "jurisdiction": "CH",
+      "baseline_business_model": "Global commodity trading, mining operations, and natural resource logistics",
+      "expected_activity": [
+        "commodity trading in metals, energy, and agricultural products",
+        "mining and resource extraction operations",
+        "logistics and supply chain for raw materials",
+        "offtake agreements and commodity financing"
+      ],
+      "expected_keywords": [
+        "commodity",
+        "mining",
+        "trading",
+        "copper",
+        "coal"
+      ],
+      "expected_jurisdictions": [
+        "CH",
+        "UK",
+        "AU",
+        "ZA",
+        "CD"
+      ],
+      "expected_monthly_volume_chf": 500000000,
+      "risk_appetite": "High-risk commodity trader; very low tolerance for bribery, corruption, sanctions, export control, or beneficial ownership drift given prior enforcement history.",
+      "expected_transaction_profile": "Very large recurring commodity trading, mining, logistics, and financing activity with known industrial and government counterparties.",
+      "ownership_assumptions": [
+        "Gary Nagle is treated as a key public person for media and governance context.",
+        "Given prior bribery enforcement history, any offshore or undisclosed ownership signals must be escalated immediately."
+      ],
+      "monitored_public_entities": [
+        "Glencore",
+        "Gary Nagle",
+        "Glencore International"
+      ],
+      "website": "https://www.glencore.com",
+      "domain": "glencore.com",
+      "risk_rating": "high",
+      "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "demo-roche-001",
+      "legal_name": "Roche Holding AG",
+      "jurisdiction": "CH",
+      "baseline_business_model": "Pharmaceutical and diagnostics research, drug development, and global healthcare solutions",
+      "expected_activity": [
+        "oncology and immunology drug development",
+        "diagnostic equipment and testing solutions",
+        "clinical trials and regulatory approvals",
+        "global medicine distribution and licensing"
+      ],
+      "expected_keywords": [
+        "pharmaceutical",
+        "oncology",
+        "diagnostics",
+        "clinical trial",
+        "drug approval"
+      ],
+      "expected_jurisdictions": [
+        "CH",
+        "US",
+        "EU",
+        "JP",
+        "CN"
+      ],
+      "expected_monthly_volume_chf": 150000000,
+      "risk_appetite": "Medium; low tolerance for bribery, price-fixing, regulatory, or clinical data fraud drift.",
+      "expected_transaction_profile": "Large recurring pharmaceutical, diagnostics, clinical, licensing, and distribution activity with known healthcare and government counterparties.",
+      "ownership_assumptions": [
+        "Thomas Schinecker is treated as a key public person for media and governance context.",
+        "Hoffmann family and Oeri family are known major shareholders \u2014 no unexpected offshore control expected."
+      ],
+      "monitored_public_entities": [
+        "Roche",
+        "Thomas Schinecker",
+        "Genentech",
+        "Roche Holding"
+      ],
+      "website": "https://www.roche.com",
+      "domain": "roche.com",
+      "risk_rating": "medium",
+      "last_kyc_review": "2026-01-20"
     }
   ]
 }
