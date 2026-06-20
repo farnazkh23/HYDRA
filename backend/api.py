@@ -357,14 +357,11 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    all_alerts: list[dict[str, Any]] = []
     for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001"):
         result = _get_pipeline(client_id)
         for event in result.get("drift_events", []):
-            mapped = _map_alert(event)
-            db.upsert_alert(mapped)
-            all_alerts.append(mapped)
-    return all_alerts
+            db.upsert_alert(_map_alert(event))
+    return db.get_all_alerts()
 
 
 @app.get("/api/alerts/{alert_id}")
