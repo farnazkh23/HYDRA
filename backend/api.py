@@ -473,7 +473,7 @@ def post_action(alert_id: str, body: dict[str, Any] = Body(...)) -> dict[str, An
 
 @app.get("/api/graph")
 def get_graph() -> dict[str, Any]:
-    # Merge live pipeline drift scores into graph nodes
+    # Compute live drift scores from pipeline for all clients
     live_scores: dict[str, tuple[int, str]] = {}
     for client_id in PORTFOLIO_CLIENT_IDS:
         result = _get_pipeline(client_id)
@@ -482,11 +482,28 @@ def get_graph() -> dict[str, Any]:
             max_score = max((e.get("drift_score", 0) for e in events), default=0)
             score_int = min(int(max_score * 100), 100)
             status = "high" if score_int >= 80 else "elevated" if score_int >= 60 else "medium"
-            # map client_id back to graph node id
             node_id = next((k for k, v in CUSTOMER_TO_CLIENT_ID.items() if v == client_id), None)
             if node_id:
                 live_scores[node_id] = (score_int, status)
 
+    # Try Neo4j live graph first
+    try:
+        from backend.neo4j_client import get_live_graph
+        company_names = [c["companyName"] for c in STATIC_CUSTOMERS]
+        neo4j_graph = get_live_graph(company_names)
+        if neo4j_graph and neo4j_graph.get("nodes"):
+            # Overlay live drift scores onto Neo4j nodes
+            for node in neo4j_graph["nodes"]:
+                label_key = node["label"].lower().replace(" ", "").replace(".", "")
+                for cust_id, (score, status) in live_scores.items():
+                    if cust_id in label_key or label_key in cust_id:
+                        node["driftScore"] = score
+                        node["riskStatus"] = status
+            return neo4j_graph
+    except Exception as exc:
+        print(f"[API] Neo4j graph unavailable, using static: {exc}", file=sys.stderr)
+
+    # Fallback: static graph with live drift scores overlaid
     nodes = []
     for node in STATIC_GRAPH["nodes"]:
         n = dict(node)
@@ -496,7 +513,6 @@ def get_graph() -> dict[str, Any]:
             n["riskStatus"] = status
             n["lastUpdated"] = "live"
         nodes.append(n)
-
     return {"nodes": nodes, "edges": STATIC_GRAPH["edges"]}
 
 
