@@ -1,8 +1,7 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build && echo '=== Build output ===' && find . -maxdepth 4 -path './node_modules' -prune -o -name '*.mjs' -print -o -name 'server.js' -print 2>/dev/null | head -40"
 
 [deploy]
-startCommand = "node server-node.mjs"
+startCommand = "node serve.mjs"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
