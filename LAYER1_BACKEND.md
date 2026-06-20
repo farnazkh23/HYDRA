@@ -84,7 +84,13 @@ Treat these fields as stable:
     "signal_type": "news",
     "source": "event_registry",
     "provider": "event_registry",
-    "entity_name": "HelioPay AG"
+    "entity_name": "HelioPay AG",
+    "related_entities": ["Atlas Digital Ltd"],
+    "relationship_hints": ["offshore_link", "business_pivot"],
+    "entity_roles": {
+      "HelioPay AG": "monitored_client",
+      "Atlas Digital Ltd": "ownership_related_entity"
+    }
   },
   "layer1_cost_units": {
     "news_queries": 1.0,
@@ -120,6 +126,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 - `severity` is derived from `drift_score`: `medium`, `high`, or `critical`.
 - `routing_hint` is advisory only; Layer 2 can still override routing.
 - `scoring_breakdown` is explainability metadata for the cheap Layer 1 gate.
+- `source_metadata.related_entities`, `relationship_hints`, and `entity_roles` are lightweight hints for Layer 2 GraphRAG.
 - `citations` are the audit trail Layer 2 should preserve in any final explanation.
 - `layer1_metrics` is for dashboards and judging; Layer 2 does not need it for reasoning.
 - `layer1_cost_units.llm_tokens` is currently always `0.0` by design.
@@ -136,7 +143,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 3. Add JSONL persistence/replay for `RawSignal`, emitted `DRIFT_EVENT`, and dropped stable signals. **Done for CLI/demo path.**
 4. Add Layer 1 metrics: signals processed, signals dropped, events emitted, drop rate, news queries, and estimated cost per 1,000 analyses. **Done for CLI/demo path.**
 5. Add unit tests for News MCP/mock fallback, scoring thresholds, dropped stable signals, and `DRIFT_EVENT` schema stability. **Done for current Layer 1 MVP.**
-6. Add multi-client runner so Layer 1 can process every profile in `backend/kyc/profiles.json`, not only one CLI client.
+6. Add relationship context fields for Layer 2 GraphRAG: `related_entities`, `relationship_hints`, and `entity_roles` in `source_metadata`. **Done for rule-based MVP.**
 7. Keep the existing `DRIFT_EVENT` output contract stable so Layer 2 does not need to change.
 
 ### P1
@@ -148,6 +155,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 5. Move thresholds and high-risk terms into config so compliance/risk teammates can tune them without editing code.
 6. Add deduplication across articles/events by title, URL, entity, and time window before scoring.
 7. Add basic data-safety guardrails: do not emit unnecessary internal baseline details, and keep public-signal data separate from simulated KYC data.
+8. Add multi-client runner so Layer 1 can process every profile in `backend/kyc/profiles.json`, not only one CLI client.
 
 ### P2(Optional)
 

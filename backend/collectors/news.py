@@ -203,7 +203,7 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
         },
         {
             "title": f"{company_name} reportedly pivots into crypto exchange services after offshore partnership",
-            "summary": "Industry sources say the firm is testing crypto exchange functionality with a newly incorporated offshore partner and undisclosed beneficial owner.",
+            "summary": "Industry sources say the firm is testing crypto exchange functionality with offshore partner Atlas Digital Ltd and an undisclosed beneficial owner.",
             "url": "mock://news/helipay-crypto-offshore-pivot",
         },
         {

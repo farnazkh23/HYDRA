@@ -34,6 +34,13 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertIn("crypto exchange", event.matched_risk_terms)
         self.assertEqual(event.scoring_breakdown["risk_term_score"], 0.54)
         self.assertEqual(event.source_metadata["provider"], "mock")
+        self.assertIn("Atlas Digital Ltd", event.source_metadata["related_entities"])
+        self.assertIn("offshore_link", event.source_metadata["relationship_hints"])
+        self.assertIn("business_pivot", event.source_metadata["relationship_hints"])
+        self.assertEqual(
+            event.source_metadata["entity_roles"]["Atlas Digital Ltd"],
+            "ownership_related_entity",
+        )
 
 
 if __name__ == "__main__":

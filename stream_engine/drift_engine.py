@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 from backend.models import DriftEvent, DriftSeverity, Layer1KycBaseline, RawSignal
+from stream_engine.relationship_context import extract_relationship_context
 
 
 class KeywordDriftEngine:
@@ -42,6 +43,7 @@ class KeywordDriftEngine:
             f"Public signal deviates from baseline '{baseline.baseline_business_model}'. "
             f"Matched risk terms: {', '.join(matched_risk_terms) or 'none'}."
         )
+        relationship_context = extract_relationship_context(signal, primary_entity=baseline.legal_name)
         return DriftEvent(
             event_id=_event_id(baseline.client_id, str(signal.metadata.get("signal_id", signal.content))),
             client_id=baseline.client_id,
@@ -72,6 +74,7 @@ class KeywordDriftEngine:
                 "source": signal.source,
                 "provider": str(signal.metadata.get("provider", "")),
                 "entity_name": signal.entity_name,
+                **relationship_context,
             },
             layer1_cost_units={
                 "news_queries": 1.0,
