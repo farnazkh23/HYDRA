@@ -52,6 +52,28 @@ app.add_middleware(
 
 _pipeline_cache: dict[str, Any] = {}   # client_id → raw pipeline result
 
+PORTFOLIO_CLIENT_IDS = (
+    "demo-spacex-001",
+    "demo-amazon-001",
+    "demo-nvidia-001",
+    "demo-binance-001",
+    "demo-tesla-001",
+    "demo-openai-001",
+    "demo-apple-001",
+    "demo-meta-001",
+)
+
+CUSTOMER_TO_CLIENT_ID = {
+    "spacex": "demo-spacex-001",
+    "amazon": "demo-amazon-001",
+    "nvidia": "demo-nvidia-001",
+    "binance": "demo-binance-001",
+    "tesla": "demo-tesla-001",
+    "openai": "demo-openai-001",
+    "apple": "demo-apple-001",
+    "meta": "demo-meta-001",
+}
+
 
 def _get_pipeline(client_id: str = "demo-spacex-001") -> dict[str, Any]:
     if client_id not in _pipeline_cache:
@@ -308,43 +330,34 @@ def _build_engine_logs(result: dict[str, Any]) -> list[dict[str, Any]]:
 
 STATIC_CUSTOMERS: list[dict[str, Any]] = [
     {"id": "spacex", "clientId": "demo-spacex-001", "companyName": "SpaceX", "legalName": "Space Exploration Technologies Corp.", "responsiblePerson": "Elon Musk", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Aerospace", "country": "United States", "onboardedDate": "Aug 12, 2023", "kycStatus": "Verified", "riskStatus": "elevated", "riskScore": 81, "driftPercent": 69, "driftSeverity": "high", "lastUpdated": "live", "transactionVolume": "$245M", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
-    {"id": "amazon", "clientId": None, "companyName": "Amazon", "legalName": "Amazon.com, Inc.", "responsiblePerson": "Jeff Bezos", "responsiblePersonRole": "Founder / Authorized Rep.", "industry": "E-commerce", "country": "United States", "onboardedDate": "Jan 04, 2024", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 18, "driftPercent": 12, "driftSeverity": "low", "lastUpdated": "18 min ago", "transactionVolume": "$1.2B", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "flat"},
-    {"id": "nvidia", "clientId": None, "companyName": "NVIDIA", "legalName": "NVIDIA Corporation", "responsiblePerson": "Jensen Huang", "responsiblePersonRole": "CEO", "industry": "Semiconductors", "country": "United States", "onboardedDate": "Mar 21, 2024", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 47, "driftPercent": 31, "driftSeverity": "medium", "lastUpdated": "11 min ago", "transactionVolume": "$612M", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
-    {"id": "binance", "clientId": None, "companyName": "Binance Holdings", "legalName": "Binance Holdings Ltd.", "responsiblePerson": "Richard Teng", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Crypto Exchange", "country": "Cayman Islands", "onboardedDate": "Oct 02, 2024", "kycStatus": "Pending", "riskStatus": "high", "riskScore": 92, "driftPercent": 84, "driftSeverity": "critical", "lastUpdated": "4 min ago", "transactionVolume": "$3.1B", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
-    {"id": "tesla", "clientId": None, "companyName": "Tesla", "legalName": "Tesla, Inc.", "responsiblePerson": "Elon Musk", "responsiblePersonRole": "CEO", "industry": "Automotive", "country": "United States", "onboardedDate": "Jul 14, 2020", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 52, "driftPercent": 42, "driftSeverity": "medium", "lastUpdated": "9 min ago", "transactionVolume": "$880M", "companyType": "Corporate", "trend": "up"},
-    {"id": "openai", "clientId": None, "companyName": "OpenAI", "legalName": "OpenAI, L.L.C.", "responsiblePerson": "Sam Altman", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Artificial Intelligence", "country": "United States", "onboardedDate": "May 04, 2023", "kycStatus": "Verified", "riskStatus": "elevated", "riskScore": 73, "driftPercent": 57, "driftSeverity": "high", "lastUpdated": "6 min ago", "transactionVolume": "$310M", "companyType": "Corporate", "trend": "up"},
-    {"id": "apple", "clientId": "demo-apple-001", "companyName": "Apple", "legalName": "Apple Inc.", "responsiblePerson": "Tim Cook", "responsiblePersonRole": "CEO", "industry": "Consumer Electronics", "country": "United States", "onboardedDate": "Feb 11, 2019", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 14, "driftPercent": 9, "driftSeverity": "low", "lastUpdated": "22 min ago", "transactionVolume": "$2.4B", "companyType": "Corporate", "trend": "flat"},
-    {"id": "meta", "clientId": None, "companyName": "Meta", "legalName": "Meta Platforms, Inc.", "responsiblePerson": "Mark Zuckerberg", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Social Media", "country": "United States", "onboardedDate": "Aug 22, 2021", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 49, "driftPercent": 36, "driftSeverity": "medium", "lastUpdated": "14 min ago", "transactionVolume": "$1.05B", "companyType": "Corporate", "trend": "down"},
-    {"id": "ubs", "clientId": "demo-ubs-001", "companyName": "UBS Group AG", "legalName": "UBS Group AG", "responsiblePerson": "Sergio Ermotti", "responsiblePersonRole": "Group CEO", "industry": "Banking", "country": "Switzerland", "onboardedDate": "Mar 15, 2023", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 12, "driftPercent": 8, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 2.1B", "companyType": "Corporate", "trend": "flat"},
-    {"id": "novartis", "clientId": "demo-novartis-001", "companyName": "Novartis AG", "legalName": "Novartis AG", "responsiblePerson": "Vas Narasimhan", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals", "country": "Switzerland", "onboardedDate": "Jan 10, 2021", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 18, "driftPercent": 11, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 980M", "companyType": "Corporate", "trend": "flat"},
-    {"id": "glencore", "clientId": "demo-glencore-001", "companyName": "Glencore PLC", "legalName": "Glencore PLC", "responsiblePerson": "Gary Nagle", "responsiblePersonRole": "CEO", "industry": "Commodity Trading", "country": "Switzerland", "onboardedDate": "Nov 03, 2022", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 61, "driftPercent": 44, "driftSeverity": "medium", "lastUpdated": "just now", "transactionVolume": "CHF 4.2B", "companyType": "Corporate", "trend": "up"},
-    {"id": "roche", "clientId": "demo-roche-001", "companyName": "Roche Holding AG", "legalName": "Roche Holding AG", "responsiblePerson": "Thomas Schinecker", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals & Diagnostics", "country": "Switzerland", "onboardedDate": "Jun 22, 2020", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 9, "driftPercent": 6, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 1.3B", "companyType": "Corporate", "trend": "flat"},
+    {"id": "amazon", "clientId": "demo-amazon-001", "companyName": "Amazon", "legalName": "Amazon.com, Inc.", "responsiblePerson": "Jeff Bezos", "responsiblePersonRole": "Founder / Authorized Rep.", "industry": "E-commerce", "country": "United States", "onboardedDate": "Jan 04, 2024", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 38, "driftPercent": 24, "driftSeverity": "medium", "lastUpdated": "live", "transactionVolume": "$1.2B", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "flat"},
+    {"id": "nvidia", "clientId": "demo-nvidia-001", "companyName": "NVIDIA", "legalName": "NVIDIA Corporation", "responsiblePerson": "Jensen Huang", "responsiblePersonRole": "CEO", "industry": "Semiconductors", "country": "United States", "onboardedDate": "Mar 21, 2024", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 47, "driftPercent": 31, "driftSeverity": "medium", "lastUpdated": "live", "transactionVolume": "$612M", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
+    {"id": "binance", "clientId": "demo-binance-001", "companyName": "Binance Holdings", "legalName": "Binance Holdings Ltd.", "responsiblePerson": "Richard Teng", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Crypto Exchange", "country": "Cayman Islands", "onboardedDate": "Oct 02, 2024", "kycStatus": "Pending", "riskStatus": "high", "riskScore": 92, "driftPercent": 84, "driftSeverity": "critical", "lastUpdated": "live", "transactionVolume": "$3.1B", "companyType": "Corporate", "isNewlyOnboarded": True, "profileBuildingStatus": "Profile building active", "trend": "up"},
+    {"id": "tesla", "clientId": "demo-tesla-001", "companyName": "Tesla", "legalName": "Tesla, Inc.", "responsiblePerson": "Elon Musk", "responsiblePersonRole": "CEO", "industry": "Automotive", "country": "United States", "onboardedDate": "Jul 14, 2020", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 52, "driftPercent": 42, "driftSeverity": "medium", "lastUpdated": "live", "transactionVolume": "$880M", "companyType": "Corporate", "trend": "up"},
+    {"id": "openai", "clientId": "demo-openai-001", "companyName": "OpenAI", "legalName": "OpenAI, L.L.C.", "responsiblePerson": "Sam Altman", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Artificial Intelligence", "country": "United States", "onboardedDate": "May 04, 2023", "kycStatus": "Verified", "riskStatus": "elevated", "riskScore": 73, "driftPercent": 57, "driftSeverity": "high", "lastUpdated": "live", "transactionVolume": "$310M", "companyType": "Corporate", "trend": "up"},
+    {"id": "apple", "clientId": "demo-apple-001", "companyName": "Apple", "legalName": "Apple Inc.", "responsiblePerson": "Tim Cook", "responsiblePersonRole": "CEO", "industry": "Consumer Electronics", "country": "United States", "onboardedDate": "Feb 11, 2019", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 44, "driftPercent": 31, "driftSeverity": "medium", "lastUpdated": "live", "transactionVolume": "$2.4B", "companyType": "Corporate", "trend": "flat"},
+    {"id": "meta", "clientId": "demo-meta-001", "companyName": "Meta", "legalName": "Meta Platforms, Inc.", "responsiblePerson": "Mark Zuckerberg", "responsiblePersonRole": "CEO / Authorized Representative", "industry": "Social Media", "country": "United States", "onboardedDate": "Aug 22, 2021", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 49, "driftPercent": 36, "driftSeverity": "medium", "lastUpdated": "live", "transactionVolume": "$1.05B", "companyType": "Corporate", "trend": "down"},
 ]
-
 STATIC_GRAPH: dict[str, Any] = {
     "nodes": [
         {"id": "spacex", "label": "SpaceX", "type": "company", "riskStatus": "elevated", "driftScore": 69, "lastUpdated": "2m"},
-        {"id": "tesla", "label": "Tesla", "type": "company", "riskStatus": "medium", "driftScore": 38, "lastUpdated": "1h"},
-        {"id": "amazon", "label": "Amazon", "type": "company", "riskStatus": "low", "driftScore": 8, "lastUpdated": "11m"},
-        {"id": "nvidia", "label": "NVIDIA", "type": "company", "riskStatus": "medium", "driftScore": 31, "lastUpdated": "26m"},
-        {"id": "binance", "label": "Binance Holdings", "type": "company", "riskStatus": "high", "driftScore": 84, "lastUpdated": "14m"},
-        {"id": "offshore", "label": "Offshore Holding Ltd", "type": "company", "riskStatus": "high", "driftScore": 71, "lastUpdated": "5m"},
-        {"id": "unknown", "label": "Unknown Entity Ltd", "type": "unknown", "riskStatus": "high", "driftScore": 77, "lastUpdated": "8m"},
-        {"id": "ch", "label": "Switzerland", "type": "jurisdiction", "riskStatus": "low", "driftScore": 4, "lastUpdated": "1d"},
-        {"id": "ky", "label": "Cayman Islands", "type": "jurisdiction", "riskStatus": "elevated", "driftScore": 58, "lastUpdated": "3h"},
+        {"id": "amazon", "label": "Amazon", "type": "company", "riskStatus": "medium", "driftScore": 24, "lastUpdated": "live"},
+        {"id": "nvidia", "label": "NVIDIA", "type": "company", "riskStatus": "medium", "driftScore": 31, "lastUpdated": "live"},
+        {"id": "binance", "label": "Binance Holdings", "type": "company", "riskStatus": "high", "driftScore": 84, "lastUpdated": "live"},
+        {"id": "tesla", "label": "Tesla", "type": "company", "riskStatus": "medium", "driftScore": 42, "lastUpdated": "live"},
+        {"id": "openai", "label": "OpenAI", "type": "company", "riskStatus": "elevated", "driftScore": 57, "lastUpdated": "live"},
+        {"id": "apple", "label": "Apple", "type": "company", "riskStatus": "medium", "driftScore": 31, "lastUpdated": "live"},
+        {"id": "meta", "label": "Meta", "type": "company", "riskStatus": "medium", "driftScore": 36, "lastUpdated": "live"},
     ],
     "edges": [
-        {"source": "spacex", "target": "tesla", "relationship": "common UBO: Elon Musk"},
-        {"source": "spacex", "target": "offshore", "relationship": "new beneficial-owner link", "isNewlyDetected": True, "severity": "high"},
-        {"source": "offshore", "target": "unknown", "relationship": "shell ownership"},
-        {"source": "unknown", "target": "ky", "relationship": "jurisdiction"},
-        {"source": "binance", "target": "ky", "relationship": "registered in"},
-        {"source": "binance", "target": "unknown", "relationship": "transactions"},
-        {"source": "tesla", "target": "ch", "relationship": "counterparty"},
-        {"source": "amazon", "target": "nvidia", "relationship": "supplier"},
-        {"source": "nvidia", "target": "ch", "relationship": "tax residence"},
+        {"source": "spacex", "target": "tesla", "relationship": "shared key person: Elon Musk"},
+        {"source": "amazon", "target": "nvidia", "relationship": "cloud/AI infrastructure exposure"},
+        {"source": "openai", "target": "nvidia", "relationship": "AI compute supply chain"},
+        {"source": "apple", "target": "meta", "relationship": "platform privacy policy exposure"},
+        {"source": "binance", "target": "spacex", "relationship": "high-volatility portfolio peer"},
     ],
 }
+
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +397,7 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
             return drift
     # Fallback
     fallback = {
-        "spacex": {"client_id": "C-54871", "overall_drift_severity": "high", "rekyc_required": True, "summary": "Client activity no longer matches KYC baseline.", "drifted_fields": [{"field": "jurisdiction", "baseline_value": "CH", "current_value": "KY", "drift_severity": "high", "source": "OpenCorporates"}, {"field": "beneficial_owners", "baseline_value": "Jane Smith", "current_value": "Jane Smith, Unknown Entity Ltd", "drift_severity": "high", "source": "GLEIF"}]},
+        "spacex": {"client_id": "C-54871", "overall_drift_severity": "high", "rekyc_required": True, "summary": "Client activity no longer matches KYC baseline.", "drifted_fields": [{"field": "jurisdiction", "baseline_value": "CH", "current_value": "KY", "drift_severity": "high", "source": "event_registry"}, {"field": "beneficial_owners", "baseline_value": "Jane Smith", "current_value": "Jane Smith, Unknown Entity Ltd", "drift_severity": "high", "source": "event_registry"}]},
     }
     if customer_id not in fallback:
         raise HTTPException(status_code=404, detail="No KYC drift record found")
@@ -397,7 +410,7 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001"):
+    for client_id in PORTFOLIO_CLIENT_IDS:
         result = _get_pipeline(client_id)
         for event in result.get("drift_events", []):
             alert = _map_alert(event)
@@ -568,12 +581,7 @@ def get_portfolio() -> dict[str, Any]:
 
 @app.get("/api/customers/{customer_id}/history")
 def get_customer_history(customer_id: str) -> dict[str, Any]:
-    client_map = {
-        "spacex": "demo-spacex-001",
-        "tesla": "demo-tesla-001",
-        "apple": "demo-apple-001",
-    }
-    client_id = client_map.get(customer_id)
+    client_id = CUSTOMER_TO_CLIENT_ID.get(customer_id)
     history: list[dict[str, Any]] = []
 
     if client_id:

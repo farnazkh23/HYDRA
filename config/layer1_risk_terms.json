@@ -20,12 +20,26 @@
       "faa investigation",
       "wildlife refuge"
     ],
-    "demo-apple-001": [
+    "demo-amazon-001": [
       "antitrust investigation",
-      "app store lawsuit",
+      "labor complaint",
+      "tax avoidance",
       "privacy complaint",
+      "warehouse safety"
+    ],
+    "demo-nvidia-001": [
+      "chip export restriction",
+      "export license",
       "supply chain diversion",
-      "labor complaint"
+      "market manipulation",
+      "ai chip smuggling"
+    ],
+    "demo-binance-001": [
+      "money laundering",
+      "sanctions evasion",
+      "aml settlement",
+      "unregistered exchange",
+      "customer asset freeze"
     ],
     "demo-tesla-001": [
       "autopilot investigation",
@@ -33,6 +47,27 @@
       "labor complaint",
       "self-driving crash",
       "battery fire"
+    ],
+    "demo-openai-001": [
+      "data privacy",
+      "model safety",
+      "misinformation",
+      "security breach",
+      "copyright lawsuit"
+    ],
+    "demo-apple-001": [
+      "antitrust investigation",
+      "app store lawsuit",
+      "privacy complaint",
+      "supply chain diversion",
+      "labor complaint"
+    ],
+    "demo-meta-001": [
+      "privacy investigation",
+      "content moderation",
+      "election interference",
+      "antitrust lawsuit",
+      "data misuse"
     ]
   }
 }

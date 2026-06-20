@@ -7,8 +7,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 # --- LAYER 1 INFRASTRUCTURE IMPORTS ---
 from backend.audit import append_layer1_audit_record
 from backend.collectors.news import EventRegistryNewsCollector, dedupe_signals
@@ -20,11 +18,25 @@ from stream_engine.relevance import evaluate_relevance
 from stream_engine.vae_snapshots import append_nominal_snapshot
 
 # --- LAYER 2 ANALYTIC INFRASTRUCTURE IMPORTS ---
-from analytic_engine.datasets import ComplianceMultiModalDataset
-from analytic_engine.graph_fusion import KnowledgeTriple, StructuralResolutionPayload, TemporalGraphFusionEngine
-from analytic_engine.models import BaseSurvivalModel
-from analytic_engine.router import CostAwareCascadingRouter
-from analytic_engine.time_series import InternalTelemetryEngine
+try:
+    import pandas as pd
+    from analytic_engine.datasets import ComplianceMultiModalDataset
+    from analytic_engine.graph_fusion import KnowledgeTriple, StructuralResolutionPayload, TemporalGraphFusionEngine
+    from analytic_engine.models import BaseSurvivalModel
+    from analytic_engine.router import CostAwareCascadingRouter
+    from analytic_engine.time_series import InternalTelemetryEngine
+
+    _LAYER2_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - optional Layer 2 deps may be absent for Layer 1 tests
+    pd = Any  # type: ignore[assignment]
+    ComplianceMultiModalDataset = None  # type: ignore[assignment]
+    KnowledgeTriple = None  # type: ignore[assignment]
+    StructuralResolutionPayload = None  # type: ignore[assignment]
+    TemporalGraphFusionEngine = None  # type: ignore[assignment]
+    BaseSurvivalModel = None  # type: ignore[assignment]
+    CostAwareCascadingRouter = None  # type: ignore[assignment]
+    InternalTelemetryEngine = None  # type: ignore[assignment]
+    _LAYER2_IMPORT_ERROR = exc
 
 DEFAULT_REPLAY_DIR = Path("data/layer1_replay")
 DEFAULT_VAE_SNAPSHOT_DIR = Path("data/layer1_vae_snapshots")
@@ -39,6 +51,11 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
     Main Event-Driven Loop B Orchestrator.
     Consumes the stable Loop A 'DRIFT_EVENT' contract payload natively.
     """
+    if _LAYER2_IMPORT_ERROR is not None:
+        raise RuntimeError(
+            "Layer 2 optional dependencies are unavailable; Layer 1 can still run normally."
+        ) from _LAYER2_IMPORT_ERROR
+
     client_id = drift_event.get("client_id", "UNKNOWN")
     client_name = drift_event.get("client_name", "Unknown Entity")
     print(f"\n⚡ [Hydra Core Action] Processing pipeline ingestion payload for customer: {client_name} ({client_id})")
@@ -356,6 +373,11 @@ def main() -> None:
         const=str(DEFAULT_REPLAY_DIR),
         help="Write raw_signals.jsonl, drift_events.jsonl, and dropped_signals.jsonl.",
     )
+    parser.add_argument(
+        "--run-layer2",
+        action="store_true",
+        help="Optionally cascade emitted DRIFT_EVENTs into the Layer 2 demo pipeline.",
+    )
     args = parser.parse_args()
 
     # 1. Execute upstream Layer 1 data ingestion with baseline snapshotting and audit logging
@@ -383,6 +405,9 @@ def main() -> None:
             ensure_ascii=False,
         )
     )
+
+    if not args.run_layer2:
+        return
 
     # 2. Feed emitted Layer 1 drift events directly into Layer 2 Deep Analytics
     drift_events = payload["drift_events"]

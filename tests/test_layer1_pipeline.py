@@ -35,8 +35,17 @@ class Layer1PipelineTests(unittest.TestCase):
             )
         )
 
-    def test_mock_pipeline_supports_three_demo_personas(self) -> None:
-        for client_id in ["demo-spacex-001", "demo-apple-001", "demo-tesla-001"]:
+    def test_mock_pipeline_supports_frontend_portfolio_personas(self) -> None:
+        for client_id in [
+            "demo-spacex-001",
+            "demo-amazon-001",
+            "demo-nvidia-001",
+            "demo-binance-001",
+            "demo-tesla-001",
+            "demo-openai-001",
+            "demo-apple-001",
+            "demo-meta-001",
+        ]:
             payload = run_layer1_pipeline(
                 client_id=client_id,
                 limit=10,
@@ -47,20 +56,28 @@ class Layer1PipelineTests(unittest.TestCase):
             self.assertEqual(len(payload["raw_signals"]), 3)
             self.assertGreaterEqual(len(payload["drift_events"]), 1)
 
-    def test_apple_persona_uses_tim_cook_context(self) -> None:
-        payload = run_layer1_pipeline(
-            client_id="demo-apple-001",
-            limit=10,
-            live=False,
-        )
+    def test_frontend_portfolio_personas_use_expected_key_people(self) -> None:
+        expected_people = {
+            "demo-amazon-001": "Jeff Bezos",
+            "demo-nvidia-001": "Jensen Huang",
+            "demo-binance-001": "Richard Teng",
+            "demo-openai-001": "Sam Altman",
+            "demo-apple-001": "Tim Cook",
+            "demo-meta-001": "Mark Zuckerberg",
+        }
+        for client_id, expected_person in expected_people.items():
+            payload = run_layer1_pipeline(
+                client_id=client_id,
+                limit=10,
+                live=False,
+            )
 
-        event_entities = [
-            entity
-            for event in payload["drift_events"]
-            for entity in event["source_metadata"]["related_entities"]
-        ]
-        self.assertIn("Tim Cook", event_entities)
-        self.assertNotIn("Elon Musk", event_entities)
+            event_entities = [
+                entity
+                for event in payload["drift_events"]
+                for entity in event["source_metadata"]["related_entities"]
+            ]
+            self.assertIn(expected_person, event_entities)
 
     def test_audit_log_records_accepted_and_dropped_signals(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
