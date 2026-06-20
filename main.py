@@ -1,46 +1,43 @@
+# main.py
 import asyncio
+import pandas as pd
 from analytic_engine.time_series import InternalTelemetryEngine
 from analytic_engine.graph_fusion import TemporalGraphFusionEngine, StructuralResolutionPayload, KnowledgeTriple
 from analytic_engine.datasets import ComplianceMultiModalDataset
-from analytic_engine.models import DeepComplianceSurvivalModel
+from analytic_engine.models import BaseSurvivalModel
 from analytic_engine.router import CostAwareCascadingRouter
-import pandas as pd
 
 
 async def execute_hydra_pipeline(client_id: str, raw_public_signal: str, incoming_triples: list,
                                  transaction_history: pd.DataFrame):
     """
-    Orchestration loop for Hydra Risk Engine (Loop B execution).
-    Triggers when Loop A dispatches a DRIFT_EVENT.
+    Main Event-Driven Loop B Orchestrator.
+    Triggers dynamically when Loop A fires a REGIME_SHIFT or DRIFT_ALERT.
     """
-    print(f"\n⚡ [Hydra Core Action] Initializing analytical pipeline for client: {client_id}")
+    print(f"\n⚡ [Hydra Core Action] Processing pipeline ingestion payload for customer: {client_id}")
 
-    # Step 1: Run Layer 2 Time-Series Engine
+    # 1. Run Live Layer 2 Internal Telemetry Checking
     ts_engine = InternalTelemetryEngine()
     _, ts_metrics = ts_engine.detect_volumetric_anomaly(transaction_history)
 
-    # Step 2: Run Temporal Graph Fusion Engine
+    # 2. Run Local Temporal Graph Fusion Update
     graph_engine = TemporalGraphFusionEngine()
     payload = StructuralResolutionPayload(
-        chain_of_thought="Evaluating structural changes from ingestion stream against baseline topology.",
+        chain_of_thought="Analyzing edge structural mutations from ingestion against baseline KYC topology.",
         detected_triples=incoming_triples
     )
-    graph_metrics = graph_engine.execute_triple_resolution(payload, timestamp="2026-06-20T11:00:00Z")
+    graph_metrics = graph_engine.execute_triple_resolution(payload, timestamp="2026-06-20T11:45:00Z")
     graph_engine.close()
 
-    # Step 3: Vectorize Multi-Modal Data Row
+    # 3. Vectorize Through Automated Imputation Layers
     data_assembler = ComplianceMultiModalDataset()
-    matrix_X = data_assembler.extract_feature_vector(ts_metrics, graph_metrics)
+    matrix_X = data_assembler.impute_and_vectorize(ts_metrics, graph_metrics)
 
-    # Step 4: Run Deep Survival Evaluation Layer
-    survival_model = DeepComplianceSurvivalModel()
-
-    # Quick fix for demo visibility: force cross-threshold state if time-series anomalies break bounds
+    # 4. Compute Continuous Deep Survival Horizon Timeline
+    survival_model = BaseSurvivalModel()
     predicted_t, uncertainty = survival_model.calculate_time_to_decay(matrix_X)
-    if ts_metrics.get("anomaly_flag", False) or graph_metrics.get("triples_added_count", 0) > 0:
-        predicted_t = 3.50  # Drop timeline below 7 days to trigger full audit trail demo
 
-    # Step 5: Evaluate Cost-Aware Guardrails and Routing
+    # 5. Route Through Budget-Aware Guardrailed Output Layer
     router = CostAwareCascadingRouter()
     final_audit_log = router.evaluate_routing_tier(client_id, predicted_t, raw_public_signal)
 
@@ -50,25 +47,32 @@ async def execute_hydra_pipeline(client_id: str, raw_public_signal: str, incomin
     print(f"Source Citations  : {final_audit_log.audit_citations}")
     print(f"Pipeline Budget   : {router.token_ledger}")
     print("=================================================================\n")
+    return final_audit_log
 
 
-# --- SIMULATE END-TO-END EXECUTION ---
+# --- RUN FULL LOOP B SIMULATION END-TO-END ---
 if __name__ == "__main__":
-    # Generate mock transaction data for an active account
+    # Generate mock transaction data mirroring the exact dormancy break spike profile your engine caught
     dates = pd.date_range(start="2026-05-01", end="2026-06-18", freq="D")
-    mock_volumes = [100 if i < 45 else 2500000 for i in range(len(dates))]
-    history_df = pd.DataFrame({"timestamp": dates, "value": mock_volumes})
+    dormancy_break_volumes = [150 if i < (len(dates) - 1) else 2500000 for i in range(len(dates))]
 
-    # Model an incoming drift mutation payload
+    history_df = pd.DataFrame({
+        "timestamp": dates,
+        "value": dormancy_break_volumes
+    })
+
+    # Sample triple mutations generated from corporate registration documents
     mock_triples = [
+        KnowledgeTriple(subject="AlphaTech GmbH", predicate="HAS_BUSINESS_MODEL", object="SaaS_Enterprise",
+                        modification_type="DELETED"),
         KnowledgeTriple(subject="AlphaTech GmbH", predicate="HAS_BUSINESS_MODEL", object="Crypto_Trading",
                         modification_type="ADDED")
     ]
 
-    # Start the async runtime loop
+    # Execute the master async wrapper loop
     asyncio.run(execute_hydra_pipeline(
         client_id="CH-4491",
-        raw_public_signal="Corporate registry updates verify business purpose change to digital asset broker.",
+        raw_public_signal="ZEFIX platform updates confirm business purpose change to active digital currency broker.",
         incoming_triples=mock_triples,
         transaction_history=history_df
     ))
