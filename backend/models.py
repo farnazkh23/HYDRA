@@ -190,18 +190,22 @@ class Layer1KycBaseline(BaseModel):
 
 
 class DriftEvent(BaseModel):
+    schema_version: str = "layer1.drift_event.v1"
     event_type: str = "DRIFT_EVENT"
     event_id: str
     client_id: str
     client_name: str
+    routing_hint: str = "layer2_structural_reasoning"
     severity: DriftSeverity
     drift_score: float = Field(ge=0.0, le=1.0)
     triggered_at: datetime = Field(default_factory=datetime.utcnow)
     matched_risk_terms: list[str]
     missing_baseline_terms: list[str]
+    scoring_breakdown: dict[str, float] = Field(default_factory=dict)
     rationale: str
     recommended_action: str
     citations: list[dict[str, str]]
+    source_metadata: dict[str, Any] = Field(default_factory=dict)
     layer1_cost_units: dict[str, float]
 
 

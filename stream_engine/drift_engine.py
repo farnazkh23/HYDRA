@@ -20,6 +20,13 @@ class KeywordDriftEngine:
         baseline_mismatch_score = min(0.2, 0.04 * len(missing_baseline_terms))
         entity_score = 0.1 if baseline.legal_name.lower() in text else 0.0
         drift_score = round(min(1.0, risk_term_score + baseline_mismatch_score + entity_score), 3)
+        scoring_breakdown = {
+            "risk_term_score": round(risk_term_score, 3),
+            "baseline_mismatch_score": round(baseline_mismatch_score, 3),
+            "entity_match_score": round(entity_score, 3),
+            "source_recency_score": 0.0,
+            "source_reliability_score": 0.0,
+        }
 
         if drift_score < 0.35:
             return None
@@ -41,8 +48,12 @@ class KeywordDriftEngine:
             client_name=baseline.legal_name,
             severity=severity,
             drift_score=drift_score,
+            routing_hint="layer2_structural_reasoning"
+            if severity in {DriftSeverity.HIGH, DriftSeverity.CRITICAL}
+            else "layer2_fast_classifier",
             matched_risk_terms=matched_risk_terms,
             missing_baseline_terms=missing_baseline_terms,
+            scoring_breakdown=scoring_breakdown,
             rationale=rationale,
             recommended_action=_recommended_action(severity),
             citations=[
@@ -53,6 +64,15 @@ class KeywordDriftEngine:
                     "source": signal.source,
                 }
             ],
+            source_metadata={
+                "raw_signal_id": str(signal.metadata.get("signal_id", "")),
+                "signal_type": signal.signal_type.value
+                if hasattr(signal.signal_type, "value")
+                else str(signal.signal_type),
+                "source": signal.source,
+                "provider": str(signal.metadata.get("provider", "")),
+                "entity_name": signal.entity_name,
+            },
             layer1_cost_units={
                 "news_queries": 1.0,
                 "llm_tokens": 0.0,

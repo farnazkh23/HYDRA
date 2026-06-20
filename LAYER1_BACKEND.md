@@ -19,11 +19,29 @@ Layer 1 does **not** run LLM reasoning, graph fusion, survival modeling, or fina
 python3 main.py --client-id demo-aminaclient-001 --limit 10
 ```
 
+Write replay files without live API calls:
+
+```bash
+python3 main.py --client-id demo-aminaclient-001 --limit 10 --write-replay-dir data/layer1_replay
+```
+
+Replay cached raw signals:
+
+```bash
+python3 main.py --client-id demo-aminaclient-001 --replay-file data/layer1_replay/raw_signals.jsonl
+```
+
+Run Layer 1 unit tests:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+```
+
 Optional live news:
 
 ```bash
 export EVENT_REGISTRY_API_KEY="..."
-python3 main.py --client-id demo-aminaclient-001 --limit 10
+python3 main.py --client-id demo-aminaclient-001 --limit 10 --live --write-replay-dir data/layer1_replay
 ```
 
 ## Contract for Layer 2
@@ -33,15 +51,24 @@ Treat these fields as stable:
 
 ```json
 {
+  "schema_version": "layer1.drift_event.v1",
   "event_type": "DRIFT_EVENT",
   "event_id": "drift_...",
   "client_id": "demo-aminaclient-001",
   "client_name": "HelioPay AG",
+  "routing_hint": "layer2_structural_reasoning",
   "severity": "high",
   "drift_score": 0.84,
   "triggered_at": "2026-06-19T20:58:57.086664+00:00",
   "matched_risk_terms": ["crypto exchange", "offshore"],
   "missing_baseline_terms": ["payments", "saas"],
+  "scoring_breakdown": {
+    "risk_term_score": 0.54,
+    "baseline_mismatch_score": 0.2,
+    "entity_match_score": 0.1,
+    "source_recency_score": 0.0,
+    "source_reliability_score": 0.0
+  },
   "rationale": "Public signal deviates from baseline...",
   "recommended_action": "Trigger enhanced due diligence and route to Layer 2 structural reasoning.",
   "citations": [
@@ -52,6 +79,13 @@ Treat these fields as stable:
       "source": "event_registry"
     }
   ],
+  "source_metadata": {
+    "raw_signal_id": "sig_...",
+    "signal_type": "news",
+    "source": "event_registry",
+    "provider": "event_registry",
+    "entity_name": "HelioPay AG"
+  },
   "layer1_cost_units": {
     "news_queries": 1.0,
     "llm_tokens": 0.0,
@@ -60,24 +94,48 @@ Treat these fields as stable:
 }
 ```
 
+The CLI also emits `layer1_metrics` for frontend/cost tracking:
+
+```json
+{
+  "schema_version": "layer1.metrics.v1",
+  "client_id": "demo-aminaclient-001",
+  "mode": "mock",
+  "signals_processed": 3,
+  "signals_dropped": 1,
+  "events_emitted": 2,
+  "drop_rate": 0.3333,
+  "emission_rate": 0.6667,
+  "news_queries": 1,
+  "llm_tokens": 0,
+  "heavy_reasoner_calls": 0,
+  "estimated_cost_units": 0.0,
+  "estimated_cost_units_per_1000_analyses": 0.0
+}
+```
+
 ## Notes for Layer 2
 
 - `drift_score < 0.35` is dropped by Layer 1 and will not reach Layer 2.
 - `severity` is derived from `drift_score`: `medium`, `high`, or `critical`.
+- `routing_hint` is advisory only; Layer 2 can still override routing.
+- `scoring_breakdown` is explainability metadata for the cheap Layer 1 gate.
 - `citations` are the audit trail Layer 2 should preserve in any final explanation.
+- `layer1_metrics` is for dashboards and judging; Layer 2 does not need it for reasoning.
 - `layer1_cost_units.llm_tokens` is currently always `0.0` by design.
 - Mock fallback is intentional so the demo still works without network/API access.
 - Shared schemas now live in `backend/models.py`.
+- Live API calls are opt-in via `--live`; default runs use mock or replay only.
 
 ## TODO-List
 
 ### P0
 
 1. Replace/augment `backend/collectors/news.py` with the team’s News MCP integration while keeping mock fallback.
-2. Add `schema_version`, `routing_hint`, `source_metadata`, and `scoring_breakdown` to `DriftEvent` without breaking existing fields.
-3. Add JSONL persistence/replay for `RawSignal`, emitted `DRIFT_EVENT`, and dropped stable signals.
-4. Add Layer 1 metrics: signals processed, signals dropped, events emitted, drop rate, news queries, and estimated cost per 1,000 analyses.
-5. Add unit tests for News MCP/mock fallback, scoring thresholds, dropped stable signals, and `DRIFT_EVENT` schema stability.
+2. Add `schema_version`, `routing_hint`, `source_metadata`, and `scoring_breakdown` to `DriftEvent` without breaking existing fields. **Done.**
+3. Add JSONL persistence/replay for `RawSignal`, emitted `DRIFT_EVENT`, and dropped stable signals. **Done for CLI/demo path.**
+4. Add Layer 1 metrics: signals processed, signals dropped, events emitted, drop rate, news queries, and estimated cost per 1,000 analyses. **Done for CLI/demo path.**
+5. Add unit tests for News MCP/mock fallback, scoring thresholds, dropped stable signals, and `DRIFT_EVENT` schema stability. **Done for current Layer 1 MVP.**
 6. Add multi-client runner so Layer 1 can process every profile in `backend/kyc/profiles.json`, not only one CLI client.
 7. Keep the existing `DRIFT_EVENT` output contract stable so Layer 2 does not need to change.
 
