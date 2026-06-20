@@ -202,6 +202,7 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
             "url": "mock://news/spacex-starlink-expansion",
             "related_entities": ["Elon Musk"],
             "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
+            "sentiment_score": 0.2,
         },
         {
             "title": f"{company_name} faces regulatory investigation over offshore launch-services partnership",
@@ -212,6 +213,7 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
                 "Elon Musk": "beneficial_owner_or_key_person",
                 "Orbital Ventures Ltd": "partner_or_counterparty",
             },
+            "sentiment_score": -0.7,
         },
         {
             "title": f"Governance lawsuit names Elon Musk in dispute linked to {company_name} financing",
@@ -219,6 +221,7 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
             "url": "mock://news/spacex-governance-lawsuit",
             "related_entities": ["Elon Musk"],
             "entity_roles": {"Elon Musk": "beneficial_owner_or_key_person"},
+            "sentiment_score": -0.45,
         },
     ]
     for sample in samples:
@@ -237,6 +240,7 @@ def mock_company_news(client_id: str, company_name: str) -> Iterable[RawSignal]:
                 "provider": "mock",
                 "related_entities": sample.get("related_entities", []),
                 "entity_roles": sample.get("entity_roles", {}),
+                "sentiment_score": sample.get("sentiment_score"),
             },
         )
 

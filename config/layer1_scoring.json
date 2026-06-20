@@ -1,0 +1,16 @@
+{
+  "thresholds": {
+    "emit_event": 0.35,
+    "high": 0.65,
+    "critical": 0.85
+  },
+  "weights": {
+    "risk_term": 0.18,
+    "risk_term_cap": 0.75,
+    "baseline_mismatch": 0.04,
+    "baseline_mismatch_cap": 0.2,
+    "entity_match": 0.1,
+    "adverse_sentiment_multiplier": 0.12,
+    "adverse_sentiment_cap": 0.12
+  }
+}

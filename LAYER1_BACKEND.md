@@ -66,6 +66,7 @@ Treat these fields as stable:
     "risk_term_score": 0.54,
     "baseline_mismatch_score": 0.2,
     "entity_match_score": 0.1,
+    "adverse_sentiment_score": 0.084,
     "source_recency_score": 0.0,
     "source_reliability_score": 0.0
   },
@@ -85,6 +86,7 @@ Treat these fields as stable:
     "source": "event_registry",
     "provider": "event_registry",
     "entity_name": "SpaceX",
+    "sentiment_score": -0.7,
     "related_entities": ["Elon Musk", "Orbital Ventures Ltd"],
     "relationship_hints": ["partnership", "regulatory_investigation", "offshore_link"],
     "entity_roles": {
@@ -127,7 +129,9 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 - `severity` is derived from `drift_score`: `medium`, `high`, or `critical`.
 - `routing_hint` is advisory only; Layer 2 can still override routing.
 - `scoring_breakdown` is explainability metadata for the cheap Layer 1 gate.
+- `scoring_breakdown.adverse_sentiment_score` uses Event Registry sentiment when available; missing sentiment contributes `0.0`.
 - `source_metadata.related_entities`, `relationship_hints`, and `entity_roles` are lightweight hints for Layer 2 GraphRAG.
+- Scoring thresholds and weights live in `config/layer1_scoring.json`.
 - `citations` are the audit trail Layer 2 should preserve in any final explanation.
 - `layer1_metrics` is for dashboards and judging; Layer 2 does not need it for reasoning.
 - `layer1_cost_units.llm_tokens` is currently always `0.0` by design.
@@ -151,9 +155,9 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 1. Improve the KYC baseline beyond keywords: business model, jurisdictions, expected activity, ownership assumptions, risk appetite, expected transaction profile, website/domain, and last KYC review.
 2. Add at least one non-news public source adapter relevant to Layer 1: registry/entity changes, domain/website changes, or funding/expansion signals.
-3. Add explainable scoring components: risk terms, baseline mismatch, source recency, source reliability, entity match, adverse sentiment, and signal type.
+3. Add explainable scoring components: risk terms, baseline mismatch, source recency, source reliability, entity match, adverse sentiment, and signal type. **Adverse sentiment done via Event Registry metadata.**
 4. Add audit logging for accepted and dropped signals, including drop reason and source citation.
-5. Move thresholds and high-risk terms into config so compliance/risk teammates can tune them without editing code.
+5. Move thresholds and high-risk terms into config so compliance/risk teammates can tune them without editing code. **Thresholds and scoring weights done.**
 6. Add deduplication across articles/events by title, URL, entity, and time window before scoring.
 7. Add basic data-safety guardrails: do not emit unnecessary internal baseline details, and keep public-signal data separate from simulated KYC data.
 8. Add multi-client runner so Layer 1 can process every profile in `backend/kyc/profiles.json`, not only one CLI client.
