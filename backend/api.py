@@ -138,6 +138,7 @@ def _map_reasoning_trace(event: dict[str, Any]) -> dict[str, Any]:
             "entity match confirmed",
             f"drop rate: {1 - scoring.get('relevance_score', 1.0):.0%} signals filtered cheaply",
         ],
+        "kg_update": None,   # populated after Neo4j write
         "hallucination_check_passed": True,
         "total_tokens_used": int(event.get("layer1_cost_units", {}).get("llm_tokens", 0)),
         "total_cost_usd": sum(event.get("layer1_cost_units", {}).values()),
@@ -406,17 +407,23 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
+    from backend.neo4j_client import update_kg_from_drift_event
     for client_id in PORTFOLIO_CLIENT_IDS:
         result = _get_pipeline(client_id)
         for event in result.get("drift_events", []):
             alert = _map_alert(event)
             db.upsert_alert(alert)
-            # Run Layer 2 if this alert doesn't have loop_b yet
             stored = db.get_alert(alert["id"])
             if stored and stored.get("reasoningTrace", {}).get("loop_b") is None:
+                # Run Layer 2 (LLM reasoning)
                 loop_b = _run_layer2(event)
                 if loop_b:
                     stored["reasoningTrace"]["loop_b"] = loop_b
+                    db.upsert_alert(stored)
+                # Update Neo4j KG (KG-GNN pattern: extract → diff → sanity check → write)
+                kg_result = update_kg_from_drift_event(event)
+                if kg_result.get("status") == "applied":
+                    stored["reasoningTrace"]["kg_update"] = kg_result
                     db.upsert_alert(stored)
     return db.get_all_alerts()
 
