@@ -62,7 +62,27 @@ export LAYER1_ONNX_TOKENIZER_PATH="models/layer1_dense"
 python3 main.py --client-id demo-spacex-001 --limit 10
 ```
 
-If the ONNX model, tokenizer, or local runtime dependencies are unavailable, Layer 1 automatically falls back to local TF-IDF, then deterministic hashing. This keeps replay/tests zero-credit and stable.
+Expected local files:
+
+```text
+models/layer1_dense/
+├── model.onnx
+├── tokenizer.json
+├── tokenizer_config.json
+├── vocab.txt
+├── special_tokens_map.json
+└── config.json
+```
+
+Verify that ONNX is active by checking the output:
+
+```json
+"dense_encoder": {
+  "encoder": "local_onnx_transformer"
+}
+```
+
+If the ONNX model, tokenizer, or local runtime dependencies are unavailable, Layer 1 falls back to local TF-IDF, then deterministic hashing, and prints a `[Layer1 warning]` message to stderr. This keeps replay/tests zero-credit and stable while making missing setup visible.
 
 ## Contract for Layer 2
 
@@ -208,7 +228,7 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 - **Live news ingestion:** Event Registry API is the official News MCP/news-source path for this project; live mode is opt-in via `--live`, and adverse query expansion is opt-in via `--expand-adverse-news`.
 - **Cost control:** default mode is mock/replay, live raw signals can be saved to JSONL, and replay runs use `news_queries: 0`.
-- **Loop A gate:** relevance filtering, local SPLADE-style weighted sparse features, optional local ONNX dense encoding, local TF-IDF/hash fallback, hybrid features, local PCA reconstruction with statistical fallback, dynamic threshold, and stable-signal drop are implemented.
+- **Loop A gate:** relevance filtering, local SPLADE-style weighted sparse features, local ONNX dense encoding with visible fallback warning, local TF-IDF/hash fallback, hybrid features, local PCA reconstruction with statistical fallback, dynamic threshold, and stable-signal drop are implemented.
 - **Layer 2 contract:** emitted `DRIFT_EVENT` payloads include citations, scoring breakdown, `loop_a_trace`, relationship hints, and stable schema fields.
 - **Quality controls:** URL/title dedupe runs before scoring for live and replay article signals; unit tests cover mock, replay, relevance, dedupe, schema, and scoring.
 
@@ -231,10 +251,9 @@ No open P0 items.
 ### P1
 
 1. Replace local SPLADE-style sparse features with true SPLADE if needed.
-2. Add an approved local ONNX model artifact/tokenizer and runtime dependency notes so the existing `local_onnx_transformer` adapter can run in every teammate environment.
-3. Replace local PCA/statistical reconstruction with a fitted lightweight VAE and learned dynamic threshold.
-4. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
-5. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
+2. Replace local PCA/statistical reconstruction with a fitted lightweight VAE and learned dynamic threshold.
+3. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
+4. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
 
 ### P2
 

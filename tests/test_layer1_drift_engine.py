@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
+from io import StringIO
 
 from backend.collectors.news import mock_company_news
 from backend.kyc.store import load_layer1_baselines
@@ -81,13 +82,19 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertIsNone(event)
 
     def test_missing_onnx_model_path_falls_back_to_local_dense_encoder(self) -> None:
-        with patch.dict("os.environ", {"LAYER1_ONNX_MODEL_PATH": "/tmp/missing-layer1-model.onnx"}):
+        stderr = StringIO()
+        with patch.dict("os.environ", {"LAYER1_ONNX_MODEL_PATH": "/tmp/missing-layer1-model.onnx"}), patch(
+            "sys.stderr",
+            stderr,
+        ):
             dense_vectorizer = build_default_dense_vectorizer()
 
         self.assertIn(
             dense_vectorizer.encoder,
             {"local_tfidf_embedding", "local_hashing_embedding"},
         )
+        self.assertIn("ONNX dense encoder unavailable", stderr.getvalue())
+        self.assertIn("falling back", stderr.getvalue())
 
     def test_risky_signal_emits_versioned_drift_event(self) -> None:
         risky_signal = list(mock_company_news(self.baseline.client_id, self.baseline.legal_name))[1]

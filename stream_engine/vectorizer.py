@@ -4,6 +4,7 @@ import hashlib
 import math
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -225,7 +226,10 @@ class DenseVectorizerWithRuntimeFallback:
     def encode(self, baseline: Layer1KycBaseline, signal: RawSignal) -> DenseFeatureVector:
         try:
             return self.primary.encode(baseline, signal)
-        except Exception:
+        except Exception as exc:
+            _warn_dense_fallback(
+                f"ONNX dense encoder inference failed ({exc}); falling back to {self.fallback.encoder}."
+            )
             return self.fallback.encode(baseline, signal)
 
 
@@ -246,8 +250,10 @@ def build_default_dense_vectorizer() -> (
                 ),
                 fallback=fallback_vectorizer,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_dense_fallback(
+                f"ONNX dense encoder unavailable ({exc}); falling back to {fallback_vectorizer.encoder}."
+            )
     return fallback_vectorizer
 
 
@@ -256,6 +262,10 @@ def _build_local_dense_fallback() -> LocalTfidfDenseVectorizer | LocalHashingDen
         return LocalTfidfDenseVectorizer()
     except Exception:
         return LocalHashingDenseVectorizer()
+
+
+def _warn_dense_fallback(message: str) -> None:
+    print(f"[Layer1 warning] {message}", file=sys.stderr)
 
 
 @dataclass(frozen=True)
