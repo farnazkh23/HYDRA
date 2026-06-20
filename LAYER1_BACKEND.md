@@ -296,7 +296,7 @@ No open P0 items.
 
 ### P1
 
-No open P1 items.
+1. Add some interaction for the user for any companies: if a company profile exists, run the Layer 1 news check against it; if not, generate a temporary baseline and run the same news check without polluting committed JSON by default.
 
 ### P2 (Optional)
 
@@ -305,4 +305,3 @@ No open P1 items.
 3. Replace local SPLADE-style sparse features with true SPLADE if needed.
 4. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
 5. Add basic data-safety guardrails (for safety concerns).
-
