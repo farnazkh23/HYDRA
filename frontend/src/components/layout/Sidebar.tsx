@@ -1,9 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, PieChart } from "lucide-react";
 import { HydraLogo } from "@/components/HydraLogo";
 
 type NavItem = {
-  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings";
+  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/portfolio";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
@@ -11,6 +11,7 @@ type NavItem = {
 };
 const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/portfolio", label: "Portfolio", icon: PieChart },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/alerts", label: "Alerts", icon: Bell, badge: 3 },
   { to: "/reports", label: "Reports", icon: FileText },

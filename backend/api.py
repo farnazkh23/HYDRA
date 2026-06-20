@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json as _json
 import sys
 import uuid
 import time
@@ -8,11 +10,28 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend import db
-from main import run_layer1_pipeline
+
+try:
+    from main import run_layer1_pipeline
+except ImportError as _import_err:
+    print(f"[HYDRA API] Layer 1 import failed ({_import_err}). Running in static-data mode.", file=sys.stderr)
+
+    def run_layer1_pipeline(client_id: str = "demo-spacex-001", **kwargs: Any) -> dict[str, Any]:  # type: ignore[misc]
+        return {
+            "drift_events": [],
+            "layer1_metrics": {
+                "client_id": client_id, "mode": "static_fallback",
+                "signals_processed": 0, "signals_dropped": 0, "events_emitted": 0,
+                "drop_rate": 0.0, "emission_rate": 0.0,
+                "news_queries": 0, "llm_tokens": 0, "heavy_reasoner_calls": 0,
+                "estimated_cost_units": 0.0, "estimated_cost_units_per_1000_analyses": 0.0,
+            },
+        }
 
 app = FastAPI(title="HYDRA Risk Intelligence API", version="1.0.0")
 
@@ -460,3 +479,149 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Portfolio — aggregate view across all clients
+# ---------------------------------------------------------------------------
+
+@app.get("/api/portfolio")
+def get_portfolio() -> dict[str, Any]:
+    result = _get_pipeline("demo-spacex-001")
+    metrics = result.get("layer1_metrics", {})
+    all_alerts = db.get_all_alerts()
+    customers = get_customers()
+
+    risk_dist: dict[str, int] = {"high": 0, "elevated": 0, "medium": 0, "low": 0}
+    for c in customers:
+        s = c.get("riskStatus", "low")
+        if s in risk_dist:
+            risk_dist[s] += 1
+
+    avg_drift = round(
+        sum(c.get("driftPercent", 0) for c in customers) / len(customers)
+    ) if customers else 0
+
+    return {
+        "total_customers": len(customers),
+        "risk_distribution": risk_dist,
+        "avg_drift_score": avg_drift,
+        "open_alerts": len([a for a in all_alerts if a.get("status") == "open"]),
+        "total_alerts": len(all_alerts),
+        "layer1_signals_processed": metrics.get("signals_processed", 0),
+        "layer1_drop_rate": metrics.get("drop_rate", 0.0),
+        "layer1_cost_usd": metrics.get("estimated_cost_units", 0.0),
+        "cost_per_1000_analyses_usd": metrics.get("estimated_cost_units_per_1000_analyses", 0.0),
+        "customers": customers,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Customer history — timeline of past drift events
+# ---------------------------------------------------------------------------
+
+@app.get("/api/customers/{customer_id}/history")
+def get_customer_history(customer_id: str) -> dict[str, Any]:
+    client_map = {
+        "spacex": "demo-spacex-001",
+        "tesla": "demo-tesla-001",
+        "apple": "demo-apple-001",
+    }
+    client_id = client_map.get(customer_id)
+    history: list[dict[str, Any]] = []
+
+    if client_id:
+        result = _get_pipeline(client_id)
+        for event in result.get("drift_events", []):
+            mapped = _map_alert(event)
+            db.upsert_alert(mapped)
+            history.append(mapped)
+
+    seen_ids = {h["id"] for h in history}
+    for alert in db.get_all_alerts():
+        cid = alert.get("customerId", "")
+        if (cid == customer_id or cid == client_id) and alert["id"] not in seen_ids:
+            history.append(alert)
+            seen_ids.add(alert["id"])
+
+    return {
+        "customer_id": customer_id,
+        "history": history,
+        "total_events": len(history),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Alert report — full export payload for compliance download
+# ---------------------------------------------------------------------------
+
+@app.get("/api/alerts/{alert_id}/report")
+def get_alert_report(alert_id: str) -> dict[str, Any]:
+    alert = db.get_alert(alert_id)
+    if not alert:
+        result = _get_pipeline("demo-spacex-001")
+        for event in result.get("drift_events", []):
+            if event.get("event_id") == alert_id:
+                alert = _map_alert(event)
+                db.upsert_alert(alert)
+                break
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    trace = alert.get("reasoningTrace") or {}
+    governance = alert.get("governance") or {}
+    actions = [a for a in db.get_audit_log() if a.get("alert_id") == alert_id]
+
+    return {
+        "report_id": f"rpt-{alert_id[:8]}",
+        "schema_version": "hydra.report.v1",
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "alert": {
+            "id": alert.get("id"),
+            "title": alert.get("title"),
+            "severity": alert.get("severity"),
+            "drift_type": alert.get("driftType"),
+            "customer": alert.get("customerName"),
+            "status": alert.get("status"),
+            "timestamp": alert.get("timestamp"),
+            "explanation": alert.get("explanation"),
+            "matched_risk_terms": alert.get("matchedRiskTerms", []),
+            "missing_baseline_terms": alert.get("missingBaselineTerms", []),
+            "drift_score": alert.get("driftScore", 0.0),
+            "recommended_action": alert.get("recommendedAction", ""),
+        },
+        "citations": alert.get("citations", []),
+        "reasoning_trace": trace,
+        "governance": governance,
+        "audit_actions": actions,
+    }
+
+
+# ---------------------------------------------------------------------------
+# SSE — real-time event stream for frontend live feed
+# ---------------------------------------------------------------------------
+
+@app.get("/api/events/stream")
+async def stream_events() -> StreamingResponse:
+    async def generator():
+        last_count = 0
+        while True:
+            try:
+                all_alerts = db.get_all_alerts()
+                current_count = len(all_alerts)
+                if current_count > last_count:
+                    for alert in all_alerts[last_count:]:
+                        payload = _json.dumps({"type": "new_alert", "alert": alert})
+                        yield f"data: {payload}\n\n"
+                    last_count = current_count
+                hb = _json.dumps({"type": "heartbeat", "ts": time.time(), "alert_count": current_count})
+                yield f"data: {hb}\n\n"
+                await asyncio.sleep(5)
+            except Exception:
+                break
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )

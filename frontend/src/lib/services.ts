@@ -89,3 +89,45 @@ export async function triggerPipeline(clientId: string, live = false) {
   if (!res.ok) throw new Error(`Pipeline trigger failed: ${res.status}`);
   return res.json();
 }
+
+export async function getPortfolio() {
+  if (MODE === "mock") {
+    const c = await mockOk(customers);
+    return {
+      total_customers: c.length,
+      risk_distribution: { high: 2, elevated: 2, medium: 3, low: 1 },
+      avg_drift_score: 40,
+      open_alerts: 3,
+      total_alerts: 3,
+      layer1_signals_processed: 10,
+      layer1_drop_rate: 0.33,
+      layer1_cost_usd: 0.0,
+      cost_per_1000_analyses_usd: 0.0,
+      customers: c,
+    };
+  }
+  return apiFetch<{
+    total_customers: number;
+    risk_distribution: Record<string, number>;
+    avg_drift_score: number;
+    open_alerts: number;
+    total_alerts: number;
+    layer1_signals_processed: number;
+    layer1_drop_rate: number;
+    layer1_cost_usd: number;
+    cost_per_1000_analyses_usd: number;
+    customers: Customer[];
+  }>("/api/portfolio");
+}
+
+export async function getCustomerHistory(customerId: string) {
+  if (MODE === "mock") return mockOk({ customer_id: customerId, history: [], total_events: 0 });
+  return apiFetch<{ customer_id: string; history: Alert[]; total_events: number }>(
+    `/api/customers/${customerId}/history`,
+  );
+}
+
+export async function getAlertReport(alertId: string) {
+  if (MODE === "mock") return mockOk(null);
+  return apiFetch(`/api/alerts/${alertId}/report`);
+}

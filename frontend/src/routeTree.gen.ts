@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as AlertsRouteImport } from './routes/alerts'
@@ -28,6 +29,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioRoute = PortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LogsRoute = LogsRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRouteWithChildren
   '/customers': typeof CustomersRouteWithChildren
   '/logs': typeof LogsRoute
+  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/logs': typeof LogsRoute
+  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRouteWithChildren
   '/customers': typeof CustomersRouteWithChildren
   '/logs': typeof LogsRoute
+  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/customers'
     | '/logs'
+    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/logs'
+    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/customers'
     | '/logs'
+    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
@@ -148,6 +160,7 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRouteWithChildren
   CustomersRoute: typeof CustomersRouteWithChildren
   LogsRoute: typeof LogsRoute
+  PortfolioRoute: typeof PortfolioRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -166,6 +179,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolio': {
+      id: '/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof PortfolioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/logs': {
@@ -259,6 +279,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlertsRoute: AlertsRouteWithChildren,
   CustomersRoute: CustomersRouteWithChildren,
   LogsRoute: LogsRoute,
+  PortfolioRoute: PortfolioRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
 }
