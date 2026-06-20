@@ -284,10 +284,16 @@ def update_kg_from_drift_event(drift_event: dict[str, Any]) -> dict[str, Any]:
 # Dashboard graph — query live nodes/edges for the network graph
 # ---------------------------------------------------------------------------
 
+def _node_id(name: str) -> str:
+    """Stable, frontend-compatible node ID from an entity name."""
+    return name.lower().replace(" ", "_").replace(".", "").replace(",", "").replace("&", "and")[:40]
+
+
 def get_live_graph(company_names: list[str]) -> dict[str, Any] | None:
     """
     Query Neo4j for nodes and edges relevant to portfolio companies.
-    Returns shape compatible with the frontend NetworkGraph component.
+    Node IDs are derived from entity names (not Neo4j element IDs) so the
+    dashboard can match company nodes by id (e.g. find(n => n.id === "spacex")).
     """
     driver = _get_driver()
     if not driver:
@@ -299,8 +305,13 @@ def get_live_graph(company_names: list[str]) -> dict[str, Any] | None:
                 """
                 MATCH (c:Entity)
                 WHERE c.name IN $names
-                OPTIONAL MATCH (c)-[r {state: 'ACTIVE'}]-(related:Entity)
-                RETURN c, r, related
+                OPTIONAL MATCH (c)-[r]-(related:Entity)
+                WHERE r.state = 'ACTIVE' OR r.end_time IS NULL OR r.end_time = 'NA'
+                RETURN c.name AS c_name, type(r) AS rel_type,
+                       related.name AS rel_name,
+                       labels(related) AS rel_labels,
+                       startNode(r).name AS src_name,
+                       endNode(r).name AS tgt_name
                 LIMIT 300
                 """,
                 names=company_names,
@@ -310,13 +321,19 @@ def get_live_graph(company_names: list[str]) -> dict[str, Any] | None:
             edges: list[dict[str, Any]] = []
             seen_edges: set[tuple[str, str, str]] = set()
 
-            for record in result:
-                c = record["c"]
-                r = record["r"]
-                related = record["related"]
+            # Map company display names → simple ids ("SpaceX" → "spacex")
+            name_to_simple: dict[str, str] = {}
+            for name in company_names:
+                simple = name.lower().replace(" ", "").replace(".", "").replace(",", "")
+                name_to_simple[name] = simple
 
-                c_id = str(c.element_id)
-                c_name = c.get("name", c_id)
+            for record in result:
+                c_name = record["c_name"]
+                if not c_name:
+                    continue
+
+                # Company node — use simple id so dashboard find() works
+                c_id = name_to_simple.get(c_name, _node_id(c_name))
                 if c_id not in nodes:
                     nodes[c_id] = {
                         "id": c_id,
@@ -327,33 +344,37 @@ def get_live_graph(company_names: list[str]) -> dict[str, Any] | None:
                         "lastUpdated": "live",
                     }
 
-                if r is None or related is None:
+                rel_name = record["rel_name"]
+                rel_type = record["rel_type"]
+                src_name = record["src_name"]
+                tgt_name = record["tgt_name"]
+
+                if not rel_name or not rel_type:
                     continue
 
-                rel_id = str(related.element_id)
-                rel_name = related.get("name", rel_id)
-                rel_labels = list(related.labels)
-                rel_type = rel_labels[0].lower() if rel_labels else "entity"
+                # Related entity node
+                rel_labels = record["rel_labels"] or []
+                rel_node_type = rel_labels[0].lower() if rel_labels else "entity"
+                rel_id = _node_id(rel_name)
                 if rel_id not in nodes:
                     nodes[rel_id] = {
                         "id": rel_id,
                         "label": rel_name,
-                        "type": rel_type,
+                        "type": rel_node_type,
                         "riskStatus": "low",
                         "driftScore": 0,
                         "lastUpdated": "live",
                     }
 
-                source_id = str(r.start_node.element_id)
-                target_id = str(r.end_node.element_id)
-                rel_type_name = r.type
-                edge_key = (source_id, target_id, rel_type_name)
+                src_id = name_to_simple.get(src_name, _node_id(src_name or ""))
+                tgt_id = name_to_simple.get(tgt_name, _node_id(tgt_name or ""))
+                edge_key = (src_id, tgt_id, rel_type)
                 if edge_key not in seen_edges:
                     seen_edges.add(edge_key)
                     edges.append({
-                        "source": source_id,
-                        "target": target_id,
-                        "relationship": rel_type_name.replace("_", " ").lower(),
+                        "source": src_id,
+                        "target": tgt_id,
+                        "relationship": rel_type.replace("_", " ").lower(),
                     })
 
         return {"nodes": list(nodes.values()), "edges": edges} if nodes else None

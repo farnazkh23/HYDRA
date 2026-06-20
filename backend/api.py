@@ -503,47 +503,103 @@ def post_action(alert_id: str, body: dict[str, Any] = Body(...)) -> dict[str, An
 # ---------------------------------------------------------------------------
 
 @app.get("/api/graph")
-def get_graph() -> dict[str, Any]:
-    # Compute live drift scores from pipeline for all clients
-    live_scores: dict[str, tuple[int, str]] = {}
+def _live_drift_scores() -> dict[str, tuple[int, str]]:
+    scores: dict[str, tuple[int, str]] = {}
     for client_id in PORTFOLIO_CLIENT_IDS:
-        result = _get_pipeline(client_id)
-        events = result.get("drift_events", [])
+        events = _get_pipeline(client_id).get("drift_events", [])
         if events:
-            max_score = max((e.get("drift_score", 0) for e in events), default=0)
-            score_int = min(int(max_score * 100), 100)
-            status = "high" if score_int >= 80 else "elevated" if score_int >= 60 else "medium"
+            s = min(int(max(e.get("drift_score", 0) for e in events) * 100), 100)
             node_id = next((k for k, v in CUSTOMER_TO_CLIENT_ID.items() if v == client_id), None)
             if node_id:
-                live_scores[node_id] = (score_int, status)
+                scores[node_id] = (s, "high" if s >= 80 else "elevated" if s >= 60 else "medium")
+    return scores
 
-    # Try Neo4j live graph first
+
+def _overlay_scores(nodes: list[dict], scores: dict[str, tuple[int, str]]) -> list[dict]:
+    for n in nodes:
+        key = n["id"].lower().replace("_", "").replace(" ", "")
+        for cust_id, (score, status) in scores.items():
+            if cust_id in key or key in cust_id:
+                n["driftScore"] = score
+                n["riskStatus"] = status
+    return nodes
+
+
+def _graph_from_db_kg_updates() -> dict[str, Any] | None:
+    """
+    Build entity graph from KG update triples stored in alert reasoning traces.
+    This gives real GraphRAG-detected relationships without requiring Neo4j.
+    """
+    name_to_id = {c["companyName"]: c["id"] for c in STATIC_CUSTOMERS}
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for alert in db.get_all_alerts():
+        kg = alert.get("reasoningTrace", {}).get("kg_update", {})
+        if kg.get("status") != "applied":
+            continue
+        for triple in kg.get("triples_added", []):
+            from_name = triple.get("node_from", "")
+            to_name = triple.get("node_to", "")
+            rel = triple.get("relationship", "")
+            if not from_name or not to_name or not rel:
+                continue
+
+            from_id = name_to_id.get(from_name, from_name.lower().replace(" ", "_")[:30])
+            if from_id not in nodes:
+                cust = next((c for c in STATIC_CUSTOMERS if c["companyName"] == from_name), None)
+                nodes[from_id] = {
+                    "id": from_id,
+                    "label": from_name,
+                    "type": "company",
+                    "riskStatus": cust.get("riskStatus", "medium") if cust else "medium",
+                    "driftScore": cust.get("driftPercent", 0) if cust else 0,
+                    "lastUpdated": "live",
+                }
+
+            to_id = to_name.lower().replace(" ", "_").replace(".", "")[:30]
+            if to_id not in nodes:
+                nodes[to_id] = {
+                    "id": to_id,
+                    "label": to_name,
+                    "type": "entity",
+                    "riskStatus": "medium",
+                    "driftScore": 0,
+                    "lastUpdated": "live",
+                }
+
+            edge_key = (from_id, to_id, rel)
+            if edge_key not in seen:
+                seen.add(edge_key)
+                edges.append({"source": from_id, "target": to_id,
+                               "relationship": rel.replace("_", " ").lower()})
+
+    return {"nodes": list(nodes.values()), "edges": edges} if nodes else None
+
+
+def get_graph() -> dict[str, Any]:
+    scores = _live_drift_scores()
+
+    # 1 — Neo4j live graph (real-time entity relationships from GraphRAG)
     try:
         from backend.neo4j_client import get_live_graph
-        company_names = [c["companyName"] for c in STATIC_CUSTOMERS]
-        neo4j_graph = get_live_graph(company_names)
+        neo4j_graph = get_live_graph([c["companyName"] for c in STATIC_CUSTOMERS])
         if neo4j_graph and neo4j_graph.get("nodes"):
-            # Overlay live drift scores onto Neo4j nodes
-            for node in neo4j_graph["nodes"]:
-                label_key = node["label"].lower().replace(" ", "").replace(".", "")
-                for cust_id, (score, status) in live_scores.items():
-                    if cust_id in label_key or label_key in cust_id:
-                        node["driftScore"] = score
-                        node["riskStatus"] = status
+            neo4j_graph["nodes"] = _overlay_scores(neo4j_graph["nodes"], scores)
             return neo4j_graph
     except Exception as exc:
-        print(f"[API] Neo4j graph unavailable, using static: {exc}", file=sys.stderr)
+        print(f"[API] Neo4j unavailable: {exc}", file=sys.stderr)
 
-    # Fallback: static graph with live drift scores overlaid
-    nodes = []
-    for node in STATIC_GRAPH["nodes"]:
-        n = dict(node)
-        if n["id"] in live_scores:
-            score, status = live_scores[n["id"]]
-            n["driftScore"] = score
-            n["riskStatus"] = status
-            n["lastUpdated"] = "live"
-        nodes.append(n)
+    # 2 — DB-backed graph from stored KG update triples (real GraphRAG, no Neo4j needed)
+    db_graph = _graph_from_db_kg_updates()
+    if db_graph and db_graph.get("nodes"):
+        db_graph["nodes"] = _overlay_scores(db_graph["nodes"], scores)
+        return db_graph
+
+    # 3 — Static fallback with live drift scores
+    nodes = [dict(n) for n in STATIC_GRAPH["nodes"]]
+    nodes = _overlay_scores(nodes, scores)
     return {"nodes": nodes, "edges": STATIC_GRAPH["edges"]}
 
 

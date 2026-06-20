@@ -10,7 +10,7 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
-  nitro: true,
+  nitro: { preset: "node-server" },
   vite: {
     server: {
       proxy: {

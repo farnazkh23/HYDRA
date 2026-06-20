@@ -22,7 +22,7 @@ if (!entry) {
 }
 
 console.log(`[serve] Entry: ${entry}`);
-const mod = await import(entry);
+const mod = await import(new URL(entry, import.meta.url));
 const handler = mod.default ?? mod;
 
 // Vinxi Node.js server — it calls listen() itself
