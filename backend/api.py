@@ -279,6 +279,7 @@ STATIC_CUSTOMERS: list[dict[str, Any]] = [
     {"id": "novartis", "clientId": "demo-novartis-001", "companyName": "Novartis AG", "legalName": "Novartis AG", "responsiblePerson": "Vas Narasimhan", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals", "country": "Switzerland", "onboardedDate": "Jan 10, 2021", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 18, "driftPercent": 11, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 980M", "companyType": "Corporate", "trend": "flat"},
     {"id": "glencore", "clientId": "demo-glencore-001", "companyName": "Glencore PLC", "legalName": "Glencore PLC", "responsiblePerson": "Gary Nagle", "responsiblePersonRole": "CEO", "industry": "Commodity Trading", "country": "Switzerland", "onboardedDate": "Nov 03, 2022", "kycStatus": "Verified", "riskStatus": "medium", "riskScore": 61, "driftPercent": 44, "driftSeverity": "medium", "lastUpdated": "just now", "transactionVolume": "CHF 4.2B", "companyType": "Corporate", "trend": "up"},
     {"id": "roche", "clientId": "demo-roche-001", "companyName": "Roche Holding AG", "legalName": "Roche Holding AG", "responsiblePerson": "Thomas Schinecker", "responsiblePersonRole": "CEO", "industry": "Pharmaceuticals & Diagnostics", "country": "Switzerland", "onboardedDate": "Jun 22, 2020", "kycStatus": "Verified", "riskStatus": "low", "riskScore": 9, "driftPercent": 6, "driftSeverity": "low", "lastUpdated": "just now", "transactionVolume": "CHF 1.3B", "companyType": "Corporate", "trend": "flat"},
+    {"id": "palantir", "clientId": "demo-palantir-001", "companyName": "Palantir Technologies", "legalName": "Palantir Technologies Inc.", "responsiblePerson": "Alex Karp", "responsiblePersonRole": "CEO", "industry": "Data Analytics & AI", "country": "United States", "onboardedDate": "Feb 28, 2025", "kycStatus": "Verified", "riskStatus": "elevated", "riskScore": 74, "driftPercent": 61, "driftSeverity": "high", "lastUpdated": "just now", "transactionVolume": "$420M", "companyType": "Corporate", "trend": "up"},
 ]
 
 STATIC_GRAPH: dict[str, Any] = {
@@ -357,7 +358,7 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001"):
+    for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001", "demo-palantir-001"):
         result = _get_pipeline(client_id)
         for event in result.get("drift_events", []):
             db.upsert_alert(_map_alert(event))
