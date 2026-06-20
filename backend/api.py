@@ -502,7 +502,6 @@ def post_action(alert_id: str, body: dict[str, Any] = Body(...)) -> dict[str, An
 # Graph / Logs / Audit / Cost
 # ---------------------------------------------------------------------------
 
-@app.get("/api/graph")
 def _live_drift_scores() -> dict[str, tuple[int, str]]:
     scores: dict[str, tuple[int, str]] = {}
     for client_id in PORTFOLIO_CLIENT_IDS:
@@ -578,6 +577,7 @@ def _graph_from_db_kg_updates() -> dict[str, Any] | None:
     return {"nodes": list(nodes.values()), "edges": edges} if nodes else None
 
 
+@app.get("/api/graph")
 def get_graph() -> dict[str, Any]:
     scores = _live_drift_scores()
 
