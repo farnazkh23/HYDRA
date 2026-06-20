@@ -429,14 +429,9 @@ def get_alert(alert_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts/{alert_id}/trace")
 def get_reasoning_trace(alert_id: str) -> dict[str, Any]:
-    result = _get_pipeline("demo-spacex-001")
-    for event in result.get("drift_events", []):
-        if event.get("event_id") == alert_id:
-            return _map_reasoning_trace(event)
-    # Fallback: return trace for first available event
-    events = result.get("drift_events", [])
-    if events:
-        return {**_map_reasoning_trace(events[0]), "alert_id": alert_id}
+    alert = db.get_alert(alert_id)
+    if alert and alert.get("reasoningTrace"):
+        return alert["reasoningTrace"]
     raise HTTPException(status_code=404, detail="No reasoning trace found")
 
 
