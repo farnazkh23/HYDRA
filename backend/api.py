@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from backend import db
 
 try:
-    from main import run_layer1_pipeline
+    from main import run_layer1_pipeline, execute_hydra_pipeline as _execute_hydra_pipeline
 except ImportError as _import_err:
     print(f"[HYDRA API] Layer 1 import failed ({_import_err}). Running in static-data mode.", file=sys.stderr)
 
@@ -33,6 +33,9 @@ except ImportError as _import_err:
                 "estimated_cost_units": 0.0, "estimated_cost_units_per_1000_analyses": 0.0,
             },
         }
+
+    async def _execute_hydra_pipeline(drift_event: dict, transaction_history: Any) -> None:  # type: ignore[misc]
+        return None
 
 app = FastAPI(title="HYDRA Risk Intelligence API", version="1.0.0")
 
@@ -104,7 +107,7 @@ def _map_reasoning_trace(event: dict[str, Any]) -> dict[str, Any]:
         "trace_id": f"trc-{event.get('event_id', uuid.uuid4().hex)[:12]}",
         "alert_id": event.get("event_id", ""),
         "loop_a": _map_loop_a_trace(loop_a_raw),
-        "loop_b": None,   # layer2 branch — not merged yet
+        "loop_b": None,   # populated later by _run_layer2()
         "audit_citations": citations,
         "guardrail_checks": [
             "relevance gate passed",
@@ -121,6 +124,43 @@ def _map_reasoning_trace(event: dict[str, Any]) -> dict[str, Any]:
         "scoring_breakdown": scoring,
         "layer1_cost_units": event.get("layer1_cost_units", {}),
     }
+
+
+def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
+    risk_token = getattr(audit_log, "risk_token", "LOW_RISK")
+    router_path = "heavy" if risk_token == "CRITICAL_BREACH" else "cheap"
+    drift_score = drift_event.get("drift_score", 0.5)
+    cot = getattr(audit_log, "chain_of_thought", "Analysis complete.")
+    citations = getattr(audit_log, "audit_citations", [])
+    horizon_days, confidence = {
+        "CRITICAL_BREACH": (0.4, 0.94),
+        "ELEVATED_DRIFT": (14.0, 0.78),
+    }.get(risk_token, (90.0, 0.62))
+    return {
+        "router": {"path": router_path, "risk_token": risk_token},
+        "timegpt": {"summary": cot, "anomaly_score": round(drift_score, 3)},
+        "survival": {
+            "summary": f"Compliance survival horizon: {horizon_days:.1f} days before regulatory action threshold.",
+            "confidence": confidence,
+        },
+        "audit_citations": citations,
+        "chain_of_thought": cot,
+    }
+
+
+def _run_layer2(drift_event: dict[str, Any]) -> dict[str, Any] | None:
+    try:
+        import pandas as pd
+        dates = pd.date_range(start="2026-05-01", end="2026-06-21", freq="D")
+        volumes = [150] * (len(dates) - 1) + [2_500_000]
+        history_df = pd.DataFrame({"timestamp": dates, "value": volumes})
+        audit_log = asyncio.run(_execute_hydra_pipeline(drift_event, history_df))
+        if audit_log is None:
+            return None
+        return _map_loop_b(audit_log, drift_event)
+    except Exception as exc:
+        print(f"[HYDRA API] Layer 2 error for {drift_event.get('event_id')}: {exc}", file=sys.stderr)
+        return None
 
 
 def _map_alert(event: dict[str, Any]) -> dict[str, Any]:
@@ -360,7 +400,15 @@ def get_alerts() -> list[dict[str, Any]]:
     for client_id in ("demo-spacex-001", "demo-tesla-001", "demo-apple-001"):
         result = _get_pipeline(client_id)
         for event in result.get("drift_events", []):
-            db.upsert_alert(_map_alert(event))
+            alert = _map_alert(event)
+            db.upsert_alert(alert)
+            # Run Layer 2 if this alert doesn't have loop_b yet
+            stored = db.get_alert(alert["id"])
+            if stored and stored.get("reasoningTrace", {}).get("loop_b") is None:
+                loop_b = _run_layer2(event)
+                if loop_b:
+                    stored["reasoningTrace"]["loop_b"] = loop_b
+                    db.upsert_alert(stored)
     return db.get_all_alerts()
 
 
