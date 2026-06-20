@@ -1,9 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, BookOpen } from "lucide-react";
 import { HydraLogo } from "@/components/HydraLogo";
 
 type NavItem = {
-  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings";
+  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/documentation";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
@@ -11,12 +11,14 @@ type NavItem = {
 };
 const nav: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/alerts", label: "Alerts", icon: Bell, badge: 2 },
   { to: "/customers", label: "Customers", icon: Users },
-  { to: "/alerts", label: "Alerts", icon: Bell, badge: 3 },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/logs", label: "Logs", icon: Terminal },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/documentation", label: "Documentation", icon: BookOpen },
 ];
+
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as DocumentationRouteImport } from './routes/documentation'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -33,6 +34,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentationRoute = DocumentationRouteImport.update({
+  id: '/documentation',
+  path: '/documentation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomersRoute = CustomersRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/customers': typeof CustomersRouteWithChildren
+  '/documentation': typeof DocumentationRoute
   '/logs': typeof LogsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/documentation': typeof DocumentationRoute
   '/logs': typeof LogsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/customers': typeof CustomersRouteWithChildren
+  '/documentation': typeof DocumentationRoute
   '/logs': typeof LogsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/customers'
+    | '/documentation'
     | '/logs'
     | '/reports'
     | '/settings'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/documentation'
     | '/logs'
     | '/reports'
     | '/settings'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/customers'
+    | '/documentation'
     | '/logs'
     | '/reports'
     | '/settings'
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRouteWithChildren
   CustomersRoute: typeof CustomersRouteWithChildren
+  DocumentationRoute: typeof DocumentationRoute
   LogsRoute: typeof LogsRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
@@ -173,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documentation': {
+      id: '/documentation'
+      path: '/documentation'
+      fullPath: '/documentation'
+      preLoaderRoute: typeof DocumentationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customers': {
@@ -258,6 +278,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRouteWithChildren,
   CustomersRoute: CustomersRouteWithChildren,
+  DocumentationRoute: DocumentationRoute,
   LogsRoute: LogsRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
