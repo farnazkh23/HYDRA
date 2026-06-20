@@ -27,3 +27,4 @@ frontend/.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.production.local
+data/layer1_replay*/
