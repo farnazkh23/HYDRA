@@ -1,0 +1,37 @@
+{
+  "clients": [
+    {
+      "client_id": "demo-aminaclient-001",
+      "legal_name": "HelioPay AG",
+      "jurisdiction": "CH",
+      "baseline_business_model": "B2B SaaS payments infrastructure for Swiss SMEs",
+      "expected_keywords": [
+        "payments",
+        "saas",
+        "invoice automation",
+        "switzerland",
+        "sme"
+      ],
+      "high_risk_keywords": [
+        "crypto exchange",
+        "offshore",
+        "sanctions",
+        "money laundering",
+        "fraud",
+        "investigation",
+        "beneficial owner",
+        "shell company",
+        "darknet",
+        "terrorist financing"
+      ],
+      "expected_jurisdictions": [
+        "CH",
+        "DE",
+        "AT"
+      ],
+      "expected_monthly_volume_chf": 250000,
+      "risk_rating": "medium-low",
+      "last_kyc_review": "2026-01-15"
+    }
+  ]
+}

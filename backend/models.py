@@ -1,7 +1,67 @@
 from datetime import datetime
 from enum import Enum
+import json
 from typing import Any
-from pydantic import BaseModel, Field
+
+try:
+    from pydantic import BaseModel, ConfigDict, Field
+except ModuleNotFoundError:
+    def ConfigDict(**kwargs: Any) -> dict[str, Any]:
+        return kwargs
+
+    class _FieldInfo:
+        def __init__(self, default: Any = None, default_factory: Any = None) -> None:
+            self.default = default
+            self.default_factory = default_factory
+
+    def Field(default: Any = None, default_factory: Any = None, **_: Any) -> Any:
+        return _FieldInfo(default=default, default_factory=default_factory)
+
+    class BaseModel:
+        def __init__(self, **data: Any) -> None:
+            for cls in reversed(type(self).mro()):
+                annotations = getattr(cls, "__annotations__", {})
+                for name in annotations:
+                    if name in data:
+                        setattr(self, name, data.pop(name))
+                        continue
+                    if hasattr(cls, name):
+                        default = getattr(cls, name)
+                        if isinstance(default, _FieldInfo):
+                            if default.default_factory is not None:
+                                setattr(self, name, default.default_factory())
+                            elif default.default is not None:
+                                setattr(self, name, default.default)
+                        elif not callable(default):
+                            setattr(self, name, default)
+            for name, value in data.items():
+                setattr(self, name, value)
+
+        def model_dump(self, mode: str = "python") -> dict[str, Any]:
+            return {
+                key: _serialize_model_value(value)
+                for key, value in self.__dict__.items()
+                if not key.startswith("_")
+            }
+
+        def json(self) -> str:
+            return json.dumps(self.model_dump(mode="json"))
+
+
+def _serialize_model_value(value: Any) -> Any:
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, list):
+        return [_serialize_model_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_serialize_model_value(item) for item in value)
+    if isinstance(value, dict):
+        return {key: _serialize_model_value(item) for key, item in value.items()}
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -22,6 +82,12 @@ class RiskLevel(str, Enum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
+
+
+class DriftSeverity(str, Enum):
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
 class AlertAction(str, Enum):
@@ -108,6 +174,35 @@ class RawSignal(BaseModel):
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class Layer1KycBaseline(BaseModel):
+    client_id: str
+    legal_name: str
+    jurisdiction: str
+    baseline_business_model: str
+    expected_keywords: list[str]
+    high_risk_keywords: list[str]
+    expected_jurisdictions: list[str]
+    expected_monthly_volume_chf: int
+    risk_rating: str
+    last_kyc_review: str
+
+
+class DriftEvent(BaseModel):
+    event_type: str = "DRIFT_EVENT"
+    event_id: str
+    client_id: str
+    client_name: str
+    severity: DriftSeverity
+    drift_score: float = Field(ge=0.0, le=1.0)
+    triggered_at: datetime = Field(default_factory=datetime.utcnow)
+    matched_risk_terms: list[str]
+    missing_baseline_terms: list[str]
+    rationale: str
+    recommended_action: str
+    citations: list[dict[str, str]]
+    layer1_cost_units: dict[str, float]
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +353,8 @@ class GraphRAGStep(BaseModel):
 
 class LoopBTrace(BaseModel):
     """Trace from HYDRA Loop B: Predictive GraphRAG & Deep Survival Inference."""
+    model_config = ConfigDict(protected_namespaces=())
+
     # GraphRAG
     graph_steps: list[GraphRAGStep]
     graph_summary: str
@@ -413,6 +510,8 @@ class ClientRiskSummary(BaseModel):
 
 
 class CostTracker(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     stage: str                                 # "loop_a" | "loop_b_fast" | "loop_b_heavy"
     model_used: str
     tokens_used: int

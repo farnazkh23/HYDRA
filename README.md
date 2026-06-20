@@ -142,7 +142,7 @@ SwissHacksHYDRA/
 │
 ├── backend/                         # FastAPI backend
 │   ├── collectors/
-│   │   ├── news.py                  # NewsAPI → RawSignal events
+│   │   ├── news.py                  # Event Registry / News MCP → RawSignal events
 │   │   ├── sanctions.py             # OpenSanctions → entity screening
 │   │   └── domain.py               # WHOIS → domain change detection
 │   ├── kyc/
@@ -153,7 +153,6 @@ SwissHacksHYDRA/
 │   └── db.py                        # SQLite store
 │
 ├── stream_engine/                   # LOOP A — Regime Detection (AI)
-│   ├── ingestion.py
 │   ├── vectorizer.py
 │   └── drift_engine.py
 │
@@ -163,9 +162,6 @@ SwissHacksHYDRA/
 │   ├── datasets.py
 │   ├── models.py
 │   └── router.py
-│
-├── config/
-│   └── baselines_all.yaml
 │
 ├── main.py                          # Async event-driven entrypoint
 └── README.md
@@ -184,7 +180,7 @@ All schemas live in `backend/models.py` and are the contract between the AI engi
   "entity_name": "Binance",
   "client_id": "client_001",
   "signal_type": "news",
-  "source": "NewsAPI",
+  "source": "event_registry",
   "content": "Binance executive arrested on money laundering charges...",
   "timestamp": "2026-06-19T10:00:00Z",
   "metadata": { "url": "...", "author": "Reuters" }
