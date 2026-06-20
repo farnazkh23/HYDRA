@@ -366,17 +366,18 @@ STATIC_GRAPH: dict[str, Any] = {
 
 @app.get("/api/customers")
 def get_customers() -> list[dict[str, Any]]:
-    # Update SpaceX risk score from live pipeline if available
-    result = _get_pipeline("demo-spacex-001")
-    events = result.get("drift_events", [])
     customers = [dict(c) for c in STATIC_CUSTOMERS]
-    if events:
-        max_score = max((e.get("drift_score", 0) for e in events), default=0)
-        for c in customers:
-            if c["id"] == "spacex":
-                c["riskScore"] = min(int(max_score * 100), 100)
-                c["driftPercent"] = min(int(max_score * 100), 100)
-                c["lastUpdated"] = "just now"
+    for c in customers:
+        client_id = CUSTOMER_TO_CLIENT_ID.get(c["id"])
+        if not client_id:
+            continue
+        result = _get_pipeline(client_id)
+        events = result.get("drift_events", [])
+        if events:
+            max_score = max((e.get("drift_score", 0) for e in events), default=0)
+            c["riskScore"] = min(int(max_score * 100), 100)
+            c["driftPercent"] = min(int(max_score * 100), 100)
+            c["lastUpdated"] = "just now"
     return customers
 
 
@@ -390,18 +391,13 @@ def get_customer(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/customers/{customer_id}/kyc-drift")
 def get_kyc_drift(customer_id: str) -> dict[str, Any]:
-    if customer_id == "spacex":
-        result = _get_pipeline("demo-spacex-001")
-        drift = _derive_kyc_drift("demo-spacex-001", result.get("drift_events", []))
+    client_id = CUSTOMER_TO_CLIENT_ID.get(customer_id)
+    if client_id:
+        result = _get_pipeline(client_id)
+        drift = _derive_kyc_drift(client_id, result.get("drift_events", []))
         if drift:
             return drift
-    # Fallback
-    fallback = {
-        "spacex": {"client_id": "C-54871", "overall_drift_severity": "high", "rekyc_required": True, "summary": "Client activity no longer matches KYC baseline.", "drifted_fields": [{"field": "jurisdiction", "baseline_value": "CH", "current_value": "KY", "drift_severity": "high", "source": "event_registry"}, {"field": "beneficial_owners", "baseline_value": "Jane Smith", "current_value": "Jane Smith, Unknown Entity Ltd", "drift_severity": "high", "source": "event_registry"}]},
-    }
-    if customer_id not in fallback:
-        raise HTTPException(status_code=404, detail="No KYC drift record found")
-    return fallback[customer_id]
+    raise HTTPException(status_code=404, detail="No KYC drift record found")
 
 
 # ---------------------------------------------------------------------------
@@ -482,8 +478,11 @@ def get_graph() -> dict[str, Any]:
 
 @app.get("/api/logs")
 def get_logs() -> list[dict[str, Any]]:
-    result = _get_pipeline("demo-spacex-001")
-    return _build_engine_logs(result)
+    logs = []
+    for client_id in PORTFOLIO_CLIENT_IDS:
+        result = _get_pipeline(client_id)
+        logs.extend(_build_engine_logs(result))
+    return logs
 
 
 @app.get("/api/audit-log")
@@ -493,18 +492,22 @@ def get_audit_log() -> list[dict[str, Any]]:
 
 @app.get("/api/cost-summary")
 def get_cost_summary() -> dict[str, Any]:
-    result = _get_pipeline("demo-spacex-001")
-    metrics = result.get("layer1_metrics", {})
+    totals: dict[str, float] = {"signals_processed": 0, "signals_dropped": 0, "events_emitted": 0, "llm_tokens": 0, "estimated_cost_units": 0.0, "news_queries": 0}
+    for client_id in PORTFOLIO_CLIENT_IDS:
+        m = _get_pipeline(client_id).get("layer1_metrics", {})
+        for k in totals:
+            totals[k] += m.get(k, 0)
+    total_sig = totals["signals_processed"] or 1
     return {
-        "total_signals_processed": metrics.get("signals_processed", 0),
-        "total_dropped_by_loop_a": metrics.get("signals_dropped", 0),
-        "total_escalated_to_loop_b": metrics.get("events_emitted", 0),
-        "total_tokens_used": int(metrics.get("llm_tokens", 0)),
-        "total_cost_usd": metrics.get("estimated_cost_units", 0.0),
-        "cost_per_1000_analyses_usd": metrics.get("estimated_cost_units_per_1000_analyses", 0.0),
-        "drop_rate": metrics.get("drop_rate", 0.0),
+        "total_signals_processed": int(totals["signals_processed"]),
+        "total_dropped_by_loop_a": int(totals["signals_dropped"]),
+        "total_escalated_to_loop_b": int(totals["events_emitted"]),
+        "total_tokens_used": int(totals["llm_tokens"]),
+        "total_cost_usd": round(totals["estimated_cost_units"], 6),
+        "cost_per_1000_analyses_usd": round(totals["estimated_cost_units"] / total_sig * 1000, 6),
+        "drop_rate": round(totals["signals_dropped"] / total_sig, 4),
         "breakdown": [
-            {"stage": "loop_a", "model_used": "local hybrid encoder (no LLM)", "tokens_used": 0, "estimated_cost_usd": 0.0, "calls": metrics.get("news_queries", 0), "cost_per_1000_analyses_usd": 0.0},
+            {"stage": "loop_a", "model_used": "local hybrid encoder (no LLM)", "tokens_used": 0, "estimated_cost_usd": 0.0, "calls": int(totals["news_queries"]), "cost_per_1000_analyses_usd": 0.0},
         ],
     }
 
