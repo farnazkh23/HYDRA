@@ -114,7 +114,7 @@ function CustomersPage() {
             <SlidersHorizontal size={13} />
             Filter & sort
           </div>
-          <div className="rounded-xl border border-border bg-card/60 glass p-3 flex flex-wrap items-center gap-2">
+          <div className="rounded-xl border border-border bg-card/60 glass p-3 flex flex-wrap items-center gap-2 lime-outline">
             <div className="relative flex-1 min-w-[220px] max-w-sm">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input

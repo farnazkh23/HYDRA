@@ -79,7 +79,7 @@ function Dashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
           <NetworkGraph nodes={nodes} edges={edges} onSelect={setSelected} selectedId={selected?.id} />
 
-          <aside className="rounded-2xl border border-border bg-card glass p-5">
+          <aside className="rounded-2xl border border-border bg-card glass p-5 lime-outline">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3">
               Selected node
             </div>
@@ -147,7 +147,7 @@ function Kpi({
   const color =
     tone === "high" ? "text-[color:var(--risk-high)]" : tone === "elevated" ? "text-[color:var(--risk-elevated)]" : "text-neon";
   return (
-    <div className="rounded-xl border border-border bg-card glass px-4 py-3 min-w-[120px]">
+    <div className="rounded-xl border border-border bg-card glass px-4 py-3 min-w-[120px] lime-outline">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
         <Icon size={12} /> {label}
       </div>

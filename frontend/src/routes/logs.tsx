@@ -82,7 +82,7 @@ function LogsPage() {
 
         <div
           ref={boxRef}
-          className="rounded-2xl border border-[oklch(1_0_0/0.08)] bg-[oklch(0.13_0.005_240)] p-5 font-mono text-[13px] leading-[1.7] h-[560px] overflow-y-auto scrollbar-thin shadow-[inset_0_0_60px_oklch(0.92_0.22_128/0.05)]"
+          className="rounded-2xl border border-[oklch(1_0_0/0.08)] bg-[oklch(0.13_0.005_240)] p-5 font-mono text-[13px] leading-[1.7] h-[560px] overflow-y-auto scrollbar-thin shadow-[inset_0_0_60px_oklch(0.92_0.22_128/0.05)] lime-outline"
         >
           {visible.map((l, i) => (
             <div key={i} className="flex items-baseline gap-3 py-0.5">

@@ -620,7 +620,7 @@ function Timeline({
       {steps.map((s, i) => (
         <li key={i} className="relative">
           <span
-            className={`absolute -left-5 top-1 h-3 w-3 rounded-full border-2 ${
+            className={`absolute -left-5 top-1 h-2 w-2 rounded-full border-2 ${
               s.done
                 ? "bg-neon border-neon shadow-[0_0_8px_oklch(0.92_0.22_128/0.6)]"
                 : "bg-background border-border"

@@ -36,7 +36,7 @@ export function CustomerFolderCard({
     <Link to="/customers/$id" params={{ id: customer.id }} className="group relative block pt-2">
       {/* Folder tab */}
       <div className="absolute top-0 left-5 h-3 w-24 rounded-t-md bg-surface-2 border border-b-0 border-border" />
-      <div className="relative rounded-xl border border-border bg-card glass p-4 transition-all group-hover:border-neon/40 group-hover:shadow-[0_0_0_1px_oklch(0.92_0.22_128/0.3),0_12px_40px_-12px_oklch(0.92_0.22_128/0.25)]">
+      <div className="relative rounded-xl border border-border bg-card glass p-4 transition-all group-hover:border-neon/40 group-hover:shadow-[0_0_0_1px_oklch(0.92_0.22_128/0.3),0_12px_40px_-12px_oklch(0.92_0.22_128/0.25)] lime-outline">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-neon/60 to-transparent" />
 
         <div className="flex items-start gap-3">
