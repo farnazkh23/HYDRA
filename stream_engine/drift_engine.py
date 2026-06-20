@@ -4,9 +4,12 @@ import hashlib
 
 from backend.models import DriftEvent, DriftSeverity, Layer1KycBaseline, RawSignal
 from stream_engine.relevance import evaluate_relevance
-from stream_engine.reconstruction import build_default_reconstruction_engine
+from pathlib import Path
+
+from stream_engine.reconstruction import build_default_reconstruction_engine, build_reconstruction_feature_vector
 from stream_engine.relationship_context import extract_relationship_context
 from stream_engine.scoring_config import Layer1ScoringConfig, load_layer1_scoring_config
+from stream_engine.source_quality import score_source_quality
 from stream_engine.vectorizer import (
     HybridSignalVectorizer,
     SparseSignalVectorizer,
@@ -17,12 +20,16 @@ from stream_engine.vectorizer import (
 class KeywordDriftEngine:
     """Cheap Layer 1 gate that emits only meaningful KYC drift events."""
 
-    def __init__(self, scoring_config: Layer1ScoringConfig | None = None) -> None:
+    def __init__(
+        self,
+        scoring_config: Layer1ScoringConfig | None = None,
+        vae_snapshot_dir: str | Path | None = None,
+    ) -> None:
         self.scoring_config = scoring_config or load_layer1_scoring_config()
         self.sparse_vectorizer = SparseSignalVectorizer()
         self.dense_vectorizer = build_default_dense_vectorizer()
         self.hybrid_vectorizer = HybridSignalVectorizer()
-        self.reconstruction_engine = build_default_reconstruction_engine()
+        self.reconstruction_engine = build_default_reconstruction_engine(snapshot_dir=vae_snapshot_dir)
 
     def score_signal(self, baseline: Layer1KycBaseline, signal: RawSignal) -> DriftEvent | None:
         weights = self.scoring_config.weights
@@ -46,6 +53,7 @@ class KeywordDriftEngine:
         entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
         sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
         adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
+        source_quality = score_source_quality(signal)
         heuristic_score = round(
             min(1.0, risk_term_score + baseline_mismatch_score + entity_score + adverse_sentiment_score),
             3,
@@ -71,8 +79,9 @@ class KeywordDriftEngine:
             "heuristic_score": heuristic_score,
             "reconstruction_error": reconstruction_result.reconstruction_error,
             "dynamic_threshold": reconstruction_result.drift_threshold,
-            "source_recency_score": 0.0,
-            "source_reliability_score": 0.0,
+            "source_recency_score": source_quality.recency_score,
+            "source_reliability_score": source_quality.reliability_score,
+            "signal_type_score": source_quality.signal_type_score,
         }
 
         if not reconstruction_result.drift_detected:
@@ -168,6 +177,9 @@ class KeywordDriftEngine:
                 "entity_name": signal.entity_name,
                 "sentiment_score": sentiment_value,
                 "relevance_matched_terms": relevance.matched_terms,
+                "source_recency_score": source_quality.recency_score,
+                "source_reliability_score": source_quality.reliability_score,
+                "signal_type_score": source_quality.signal_type_score,
                 **relationship_context,
             },
             layer1_cost_units={
@@ -175,6 +187,44 @@ class KeywordDriftEngine:
                 "llm_tokens": 0.0,
                 "heavy_reasoner_calls": 0.0,
             },
+        )
+
+    def nominal_snapshot_for_signal(
+        self,
+        baseline: Layer1KycBaseline,
+        signal: RawSignal,
+    ) -> list[float] | None:
+        relevance = evaluate_relevance(baseline, signal)
+        if not relevance.relevant:
+            return None
+
+        sparse_features = self.sparse_vectorizer.encode(baseline, signal)
+        if sparse_features.matched_risk_terms:
+            return None
+
+        dense_features = self.dense_vectorizer.encode(baseline, signal)
+        hybrid_features = self.hybrid_vectorizer.encode(sparse_features, dense_features)
+        weights = self.scoring_config.weights
+        text = signal.content.lower()
+        baseline_mismatch_score = min(
+            weights.baseline_mismatch_cap,
+            weights.baseline_mismatch * len(sparse_features.missing_baseline_terms),
+        )
+        entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
+        sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
+        adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
+        heuristic_score = round(
+            min(1.0, baseline_mismatch_score + entity_score + adverse_sentiment_score),
+            3,
+        )
+        if heuristic_score >= self.scoring_config.thresholds.emit_event:
+            return None
+
+        return build_reconstruction_feature_vector(
+            sparse_features=sparse_features,
+            dense_features=dense_features,
+            hybrid_features=hybrid_features,
+            heuristic_score=heuristic_score,
         )
 
 

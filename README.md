@@ -9,32 +9,27 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        PUBLIC DATA SOURCES                          │
-│  NewsAPI · OpenSanctions · WHOIS · OpenCorporates · GLEIF · GDELT  │
+│  Event Registry / News MCP · replay JSONL · mock persona signals    │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ RawSignal events
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       BACKEND  (FastAPI)                            │
+│                       BACKEND  (CLI / Python)                       │
 │                                                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │  Collectors  │  │  KYC Store   │  │      Scheduler         │   │
-│  │  news.py     │  │  profiles/   │  │  APScheduler           │   │
-│  │  sanctions   │─▶│  (baselines) │  │  polls sources /5 min  │   │
-│  │  domain.py   │  └──────────────┘  └────────────────────────┘   │
+│  │  Collectors  │  │  KYC Store   │  │  Replay / Audit Logs   │   │
+│  │  news.py     │  │  profiles/   │  │  JSONL outputs         │   │
+│  │  EventReg.   │─▶│  baselines   │  │  accepted/dropped      │   │
+│  │  mock/replay │  └──────────────┘  └────────────────────────┘   │
 │  └──────┬───────┘                                                   │
 │         │                                                           │
 │         ▼                                                           │
 │  ┌─────────────────────────────────────┐  ┌─────────────────────┐ │
-│  │         REST API (FastAPI)          │  │    Alert Store      │ │
-│  │  GET  /clients                      │◀─│    (SQLite)         │ │
-│  │  GET  /clients/{id}/alerts          │  │  alerts             │ │
-│  │  GET  /clients/{id}/risk            │  │  reasoning traces   │ │
-│  │  GET  /clients/{id}/kyc-drift       │  │  governance records │ │
-│  │  GET  /alerts/{id}/trace            │  │  audit log          │ │
-│  │  GET  /alerts/{id}/governance       │  └─────────────────────┘ │
-│  │  POST /alerts/{id}/action           │                           │
-│  │  GET  /audit-log                    │                           │
-│  │  GET  /cost-summary                 │                           │
+│  │       main.py Layer 1 runner        │  │   JSONL Outputs     │ │
+│  │  --live Event Registry              │◀─│  drift_events       │ │
+│  │  --replay-file cached signals       │  │  dropped_signals    │ │
+│  │  --write-replay-dir handoff files   │  │  layer1_metrics     │ │
+│  │  --audit-log-dir decision log       │  │  audit records      │ │
 │  └────────────────┬────────────────────┘                           │
 └───────────────────┼─────────────────────────────────────────────────┘
                     │ RawSignal stream
@@ -45,7 +40,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │  LOOP A — High-Frequency Latent Regime Detection             │  │
 │  │                                                              │  │
-│  │  SPLADE + ONNX Transformer (hybrid sparse/dense embedding)   │  │
+│  │  SPLADE-style sparse + ONNX Transformer dense embedding      │  │
 │  │       ↓                                                      │  │
 │  │  VAE Reconstruction Error vs dynamic variance threshold      │  │
 │  │       ↓                                                      │  │
@@ -138,19 +133,15 @@
 SwissHacksHYDRA/
 │
 ├── frontend/                        # React dashboard
-│   └── (React app — TBD)
 │
-├── backend/                         # FastAPI backend
+├── backend/                         # Layer 1 backend support
 │   ├── collectors/
 │   │   ├── news.py                  # Event Registry / News MCP → RawSignal events
-│   │   ├── sanctions.py             # OpenSanctions → entity screening
-│   │   └── domain.py               # WHOIS → domain change detection
 │   ├── kyc/
 │   │   └── profiles.json           # Simulated KYC baseline profiles
-│   ├── api.py                       # FastAPI routes
-│   ├── scheduler.py                 # APScheduler polling loop
+│   ├── audit.py                     # accepted/dropped Layer 1 audit JSONL
 │   ├── models.py                    # All Pydantic schemas (shared contract)
-│   └── db.py                        # SQLite store
+│   └── replay.py                    # replay/read-write JSONL helpers
 │
 ├── stream_engine/                   # LOOP A — Regime Detection (AI)
 │   ├── vectorizer.py
@@ -281,14 +272,14 @@ All schemas live in `backend/models.py` and are the contract between the AI engi
       "baseline_value": "CH",
       "current_value": "KY",
       "drift_severity": "HIGH",
-      "source": "OpenCorporates"
+      "source": "event_registry"
     },
     {
       "field": "beneficial_owners",
       "baseline_value": "Jane Smith",
       "current_value": "Jane Smith, Unknown Entity Ltd",
       "drift_severity": "CRITICAL",
-      "source": "GLEIF"
+      "source": "event_registry"
     }
   ]
 }
@@ -331,13 +322,13 @@ All schemas live in `backend/models.py` and are the contract between the AI engi
 | Layer | Technology |
 |---|---|
 | Frontend | React + TailwindCSS |
-| Backend API | Python · FastAPI |
-| Scheduling | APScheduler |
-| Database | SQLite (alerts, traces, governance, audit log) |
-| AI Engine — Loop A | SPLADE · ONNX · VAE |
+| Backend | Python CLI · JSONL replay/audit handoff |
+| Scheduling | Optional future scheduler; current MVP is one-shot CLI/replay |
+| Database | JSONL replay, metrics, VAE snapshots, and audit logs |
+| AI Engine — Loop A | SPLADE-style sparse · ONNX · VAE |
 | AI Engine — Loop B | Neo4j · TimeGPT · DeepSurv/SumoNet · DeepSeek-R1 |
 | Structured Generation | Outlines / Instructor (Pydantic-enforced output) |
-| Data Sources | NewsAPI · OpenSanctions · WHOIS · OpenCorporates · GLEIF |
+| Data Sources | Event Registry / News MCP · replay JSONL · mock persona signals |
 
 ---
 

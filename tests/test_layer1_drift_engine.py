@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
+from io import StringIO
 
 from backend.collectors.news import mock_company_news
 from backend.kyc.store import load_layer1_baselines
@@ -54,11 +55,18 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertEqual(scoring_config.weights.adverse_sentiment_cap, 0.12)
 
     def test_spacex_baseline_has_nominal_behavior_context(self) -> None:
+        baselines = load_layer1_baselines()
+
+        self.assertGreaterEqual(len(baselines), 3)
+        self.assertIn("demo-apple-001", baselines)
+        self.assertIn("demo-tesla-001", baselines)
         self.assertIn("Starlink", self.baseline.monitored_public_entities)
         self.assertIn("Elon Musk", self.baseline.monitored_public_entities)
         self.assertIn("commercial satellite launches", self.baseline.expected_activity)
         self.assertEqual(self.baseline.domain, "spacex.com")
         self.assertIn("export-control", self.baseline.risk_appetite)
+        self.assertIn("investigation", self.baseline.high_risk_keywords)
+        self.assertIn("faa investigation", self.baseline.high_risk_keywords)
 
     def test_custom_threshold_can_suppress_risky_signal(self) -> None:
         strict_config = Layer1ScoringConfig(
@@ -81,13 +89,19 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertIsNone(event)
 
     def test_missing_onnx_model_path_falls_back_to_local_dense_encoder(self) -> None:
-        with patch.dict("os.environ", {"LAYER1_ONNX_MODEL_PATH": "/tmp/missing-layer1-model.onnx"}):
+        stderr = StringIO()
+        with patch.dict("os.environ", {"LAYER1_ONNX_MODEL_PATH": "/tmp/missing-layer1-model.onnx"}), patch(
+            "sys.stderr",
+            stderr,
+        ):
             dense_vectorizer = build_default_dense_vectorizer()
 
         self.assertIn(
             dense_vectorizer.encoder,
             {"local_tfidf_embedding", "local_hashing_embedding"},
         )
+        self.assertIn("ONNX dense encoder unavailable", stderr.getvalue())
+        self.assertIn("falling back", stderr.getvalue())
 
     def test_risky_signal_emits_versioned_drift_event(self) -> None:
         risky_signal = list(mock_company_news(self.baseline.client_id, self.baseline.legal_name))[1]
@@ -107,14 +121,31 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertEqual(event.loop_a_trace["trace_mode"], "vae_compatible_proxy")
         self.assertIn(
             event.loop_a_trace["reconstruction_engine"],
-            {"local_pca_reconstruction", "vae_compatible_statistical_proxy"},
+            {
+                "lightweight_vae_reconstruction",
+                "local_pca_reconstruction",
+                "vae_compatible_statistical_proxy",
+            },
         )
         self.assertEqual(event.loop_a_trace["vae_reconstruction_error"], 1.0)
         self.assertEqual(event.loop_a_trace["drift_threshold"], 0.35)
         self.assertIn("nominal_mean", event.loop_a_trace["nominal_profile"])
         self.assertIn("fit_mode", event.loop_a_trace["nominal_profile"])
+        if event.loop_a_trace["reconstruction_engine"] == "lightweight_vae_reconstruction":
+            self.assertEqual(
+                event.loop_a_trace["nominal_profile"]["fit_mode"],
+                "lightweight_vae_baseline_80_20",
+            )
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["latent_dimensions"], 2)
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["train_samples"], 8)
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["validation_samples"], 2)
+            self.assertIn("vae_loss", event.loop_a_trace["nominal_profile"])
+            self.assertIn("fallback_engine", event.loop_a_trace["nominal_profile"])
         self.assertIn("dynamic_threshold", event.scoring_breakdown)
         self.assertIn("reconstruction_error", event.scoring_breakdown)
+        self.assertGreater(event.scoring_breakdown["source_recency_score"], 0.0)
+        self.assertGreater(event.scoring_breakdown["source_reliability_score"], 0.0)
+        self.assertGreater(event.scoring_breakdown["signal_type_score"], 0.0)
         self.assertEqual(event.scoring_breakdown["relevance_score"], 1.0)
         self.assertTrue(event.loop_a_trace["drift_detected"])
         self.assertEqual(event.loop_a_trace["relevance_gate"]["reason"], "matched_monitored_entity")
@@ -170,6 +201,9 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertLessEqual(event.scoring_breakdown["hybrid_shift_score"], 1.0)
         self.assertEqual(event.source_metadata["provider"], "mock")
         self.assertEqual(event.source_metadata["sentiment_score"], -0.7)
+        self.assertEqual(event.source_metadata["signal_type_score"], 0.7)
+        self.assertGreater(event.source_metadata["source_recency_score"], 0.0)
+        self.assertGreater(event.source_metadata["source_reliability_score"], 0.0)
         self.assertIn("Elon Musk", event.source_metadata["related_entities"])
         self.assertIn("Orbital Ventures Ltd", event.source_metadata["related_entities"])
         self.assertIn("offshore_link", event.source_metadata["relationship_hints"])

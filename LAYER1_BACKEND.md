@@ -5,12 +5,14 @@ structured `DRIFT_EVENT` payloads for Layer 2.
 
 ## Current Workflow
 
-1. Load simulated KYC baselines from `backend/kyc/profiles.json`.
+1. Load simulated KYC baselines from `backend/kyc/profiles.json` and configurable risk terms from `config/layer1_risk_terms.json`.
 2. Fetch company news through `backend/collectors/news.py`.
 3. Emit shared `backend.models.RawSignal` objects.
 4. Drop signals that fail the monitored-client relevance gate.
-5. Score relevant signals with `stream_engine/drift_engine.py`.
-6. Emit only meaningful `DRIFT_EVENT` objects.
+5. Encode relevant signals with local sparse + dense features.
+6. Fit the lightweight VAE from baseline start-point samples plus stable time-series snapshots.
+7. Emit only meaningful `DRIFT_EVENT` objects; stable signals are dropped and saved as future VAE snapshots.
+8. Write accepted/dropped decision audit records for replay and teammate debugging.
 
 Layer 1 does **not** run LLM reasoning, graph fusion, survival modeling, or final compliance decisions.
 
@@ -19,6 +21,26 @@ Layer 1 does **not** run LLM reasoning, graph fusion, survival modeling, or fina
 ```bash
 python3 main.py --client-id demo-spacex-001 --limit 10
 ```
+
+By default, CLI runs persist stable VAE snapshots to:
+
+```text
+data/layer1_vae_snapshots/demo-spacex-001.jsonl
+```
+
+By default, CLI runs also write accepted/dropped audit records to:
+
+```text
+data/layer1_audit_logs/demo-spacex-001.jsonl
+```
+
+Use a separate snapshot directory when testing alternate runs:
+
+```bash
+python3 main.py --client-id demo-spacex-001 --limit 10 --vae-snapshot-dir /tmp/layer1_vae_snapshots
+```
+
+Use `--audit-log-dir /tmp/layer1_audit_logs` if you want disposable audit logs during local testing.
 
 Write replay files without live API calls:
 
@@ -57,12 +79,42 @@ python3 main.py --client-id demo-spacex-001 --limit 3 --live --expand-adverse-ne
 Optional local ONNX dense encoder:
 
 ```bash
+pip install onnxruntime transformers numpy
+
 export LAYER1_ONNX_MODEL_PATH="models/layer1_dense/model.onnx"
 export LAYER1_ONNX_TOKENIZER_PATH="models/layer1_dense"
 python3 main.py --client-id demo-spacex-001 --limit 10
 ```
 
-If the ONNX model, tokenizer, or local runtime dependencies are unavailable, Layer 1 automatically falls back to local TF-IDF, then deterministic hashing. This keeps replay/tests zero-credit and stable.
+Expected local files:
+
+```text
+models/layer1_dense/
+├── model.onnx
+├── tokenizer.json
+├── tokenizer_config.json
+├── vocab.txt
+├── special_tokens_map.json
+└── config.json
+```
+
+Verify that ONNX is active by checking the output:
+
+```json
+"dense_encoder": {
+  "encoder": "local_onnx_transformer"
+}
+```
+
+If the ONNX model, tokenizer, or local runtime dependencies are unavailable, Layer 1 falls back to local TF-IDF, then deterministic hashing, and prints a `[Layer1 warning]` message to stderr. This keeps replay/tests zero-credit and stable while making missing setup visible.
+
+## VAE Snapshot Workflow
+
+- **Start point:** baseline-derived nominal samples from `backend/kyc/profiles.json` seed the VAE when no history exists.
+- **Snapshot:** each relevant stable signal is converted into the same 7-dimensional hybrid feature vector used by the VAE.
+- **Time series:** stable snapshots are appended to `data/layer1_vae_snapshots/<client_id>.jsonl` and capped to the latest 200 records.
+- **Training mix:** each run fits the VAE on `baseline nominal samples + stable historical snapshots`, then uses an 80/20 train/validation split to calibrate the threshold.
+- **Safety rule:** `DRIFT_EVENT` signals, irrelevant signals, and signals with matched risk terms are not written into the nominal snapshot buffer.
 
 ## Contract for Layer 2
 
@@ -77,11 +129,11 @@ Treat these fields as stable:
   "client_id": "demo-spacex-001",
   "client_name": "SpaceX",
   "routing_hint": "layer2_structural_reasoning",
-  "severity": "high",
-  "drift_score": 0.84,
+  "severity": "critical",
+  "drift_score": 1.0,
   "triggered_at": "2026-06-19T20:58:57.086664+00:00",
-  "matched_risk_terms": ["crypto exchange", "offshore"],
-  "missing_baseline_terms": ["payments", "saas"],
+  "matched_risk_terms": ["investigation", "export control", "offshore", "governance"],
+  "missing_baseline_terms": ["launch", "satellite", "starlink", "aerospace", "space transportation"],
   "scoring_breakdown": {
     "risk_term_score": 0.54,
     "baseline_mismatch_score": 0.2,
@@ -93,12 +145,13 @@ Treat these fields as stable:
     "heuristic_score": 0.84,
     "reconstruction_error": 0.9,
     "dynamic_threshold": 0.35,
-    "source_recency_score": 0.0,
-    "source_reliability_score": 0.0
+    "source_recency_score": 1.0,
+    "source_reliability_score": 0.7,
+    "signal_type_score": 0.7
   },
   "loop_a_trace": {
     "trace_mode": "vae_compatible_proxy",
-    "reconstruction_engine": "local_pca_reconstruction",
+    "reconstruction_engine": "lightweight_vae_reconstruction",
     "vae_reconstruction_error": 0.9,
     "drift_threshold": 0.35,
     "dynamic_variance": 0.0036,
@@ -110,16 +163,23 @@ Treat these fields as stable:
       "matched_terms": ["SpaceX", "Elon Musk"],
       "reason": "matched_monitored_entity"
     },
-    "top_keywords_matched": ["crypto exchange", "offshore"],
+    "top_keywords_matched": ["investigation", "export control", "offshore", "governance"],
     "embedding_shift_score": 0.3,
     "decision": "DRIFT_EVENT emitted",
     "tokens_used": 0,
     "cost_usd": 0.0,
     "nominal_profile": {
-      "fit_mode": "baseline_profile_proxy",
+      "fit_mode": "lightweight_vae_baseline_80_20",
       "expected_signal_count": 9,
       "nominal_mean": 0.14,
-      "nominal_std": 0.06
+      "nominal_std": 0.06,
+      "latent_dimensions": 2,
+      "train_samples": 8,
+      "validation_samples": 2,
+      "start_point_samples": 10,
+      "time_series_snapshots": 0,
+      "vae_loss": 0.48,
+      "fallback_engine": "local_pca_reconstruction"
     },
     "sparse_encoder": {
       "encoder": "local_splade_style_sparse",
@@ -127,7 +187,10 @@ Treat these fields as stable:
       "activation_count": 8,
       "matched_entities": ["SpaceX", "Elon Musk"],
       "activations": {
+        "risk::investigation": 1.0,
+        "risk::export control": 1.0,
         "risk::offshore": 1.0,
+        "risk::governance": 1.0,
         "entity::SpaceX": 1.0
       }
     },
@@ -154,7 +217,7 @@ Treat these fields as stable:
   "recommended_action": "Trigger enhanced due diligence and route to Layer 2 structural reasoning.",
   "citations": [
     {
-      "title": "Article title",
+      "title": "SpaceX faces regulatory investigation over offshore launch-services partnership",
       "url": "https://...",
       "published_at": "2026-06-19T20:58:57.086518+00:00",
       "source": "event_registry"
@@ -206,19 +269,22 @@ The CLI also emits `layer1_metrics` for frontend/cost tracking:
 
 ## Current MVP Coverage
 
+- **Demo personas:** three monitored personas are supported out of the box: `demo-spacex-001`, `demo-apple-001`, and `demo-tesla-001`.
 - **Live news ingestion:** Event Registry API is the official News MCP/news-source path for this project; live mode is opt-in via `--live`, and adverse query expansion is opt-in via `--expand-adverse-news`.
 - **Cost control:** default mode is mock/replay, live raw signals can be saved to JSONL, and replay runs use `news_queries: 0`.
-- **Loop A gate:** relevance filtering, local SPLADE-style weighted sparse features, optional local ONNX dense encoding, local TF-IDF/hash fallback, hybrid features, local PCA reconstruction with statistical fallback, dynamic threshold, and stable-signal drop are implemented.
+- **Loop A gate:** relevance filtering, configurable risk terms, local SPLADE-style weighted sparse features, local ONNX dense encoding with visible fallback warning, local TF-IDF/hash fallback, hybrid features, lightweight VAE reconstruction with baseline start point + stable snapshot time series, 80/20 fit/validation, PCA/statistical fallback, dynamic threshold, and stable-signal drop are implemented.
 - **Layer 2 contract:** emitted `DRIFT_EVENT` payloads include citations, scoring breakdown, `loop_a_trace`, relationship hints, and stable schema fields.
-- **Quality controls:** URL/title dedupe runs before scoring for live and replay article signals; unit tests cover mock, replay, relevance, dedupe, schema, and scoring.
+- **Quality controls:** URL/title dedupe, source quality scoring, and accepted/dropped audit logging run before downstream routing; unit tests cover mock, replay, relevance, dedupe, schema, source scoring, audit logging, persona support, and drift scoring.
 
 ## Notes for Layer 2
 
 - `severity` is derived from `drift_score`: `medium`, `high`, or `critical`.
 - `routing_hint` is advisory only; Layer 2 can still override routing.
 - `relevance_gate` prevents unrelated public signals from reaching Layer 2 even if they contain generic risk terms.
-- `loop_a_trace` is currently VAE-compatible and uses local PCA reconstruction when sklearn is available; the interface can be swapped for a real VAE without changing Layer 2’s contract.
+- `loop_a_trace.nominal_profile` exposes VAE fit metadata, including start-point sample count, time-series snapshot count, train/validation split, and current `vae_loss`.
+- `loop_a_trace` uses `lightweight_vae_reconstruction` when numpy/sklearn are available, with local PCA/statistical fallback if VAE fitting fails.
 - `source_metadata.related_entities`, `relationship_hints`, and `entity_roles` are lightweight hints for Layer 2 GraphRAG.
+- `source_recency_score`, `source_reliability_score`, and `signal_type_score` are cheap source-quality hints; they are included in `scoring_breakdown` and `source_metadata`.
 - `citations` are the audit trail Layer 2 should preserve in any final explanation.
 - Layer 1 does not use LLM tokens or heavy reasoner calls.
 
@@ -230,16 +296,13 @@ No open P0 items.
 
 ### P1
 
-1. Replace local SPLADE-style sparse features with true SPLADE if needed.
-2. Add an approved local ONNX model artifact/tokenizer and runtime dependency notes so the existing `local_onnx_transformer` adapter can run in every teammate environment.
-3. Replace local PCA/statistical reconstruction with a fitted lightweight VAE and learned dynamic threshold.
-4. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
-5. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
+No open P1 items.
 
-### P2
+### P2 (Optional)
 
-1. Add source recency, source reliability, and signal type scoring.
-2. Add full audit logging for accepted and dropped signals beyond the current CLI/replay drop reasons.
-3. Move high-risk terms into config so risk teammates can tune them without editing client profiles.
-4. Add basic data-safety guardrails to avoid leaking unnecessary internal baseline details downstream.
-5. Add multi-client runner only if the demo needs portfolio-level monitoring.
+1. Add multi-client runner only if the demo needs portfolio-level monitoring.
+2. Add latency/throughput benchmark.
+3. Replace local SPLADE-style sparse features with true SPLADE if needed.
+4. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
+5. Add basic data-safety guardrails (for safety concerns).
+

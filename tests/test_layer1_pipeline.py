@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +35,56 @@ class Layer1PipelineTests(unittest.TestCase):
             )
         )
 
+    def test_mock_pipeline_supports_three_demo_personas(self) -> None:
+        for client_id in ["demo-spacex-001", "demo-apple-001", "demo-tesla-001"]:
+            payload = run_layer1_pipeline(
+                client_id=client_id,
+                limit=10,
+                live=False,
+            )
+
+            self.assertEqual(payload["layer1_metrics"]["client_id"], client_id)
+            self.assertEqual(len(payload["raw_signals"]), 3)
+            self.assertGreaterEqual(len(payload["drift_events"]), 1)
+
+    def test_apple_persona_uses_tim_cook_context(self) -> None:
+        payload = run_layer1_pipeline(
+            client_id="demo-apple-001",
+            limit=10,
+            live=False,
+        )
+
+        event_entities = [
+            entity
+            for event in payload["drift_events"]
+            for entity in event["source_metadata"]["related_entities"]
+        ]
+        self.assertIn("Tim Cook", event_entities)
+        self.assertNotIn("Elon Musk", event_entities)
+
+    def test_audit_log_records_accepted_and_dropped_signals(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audit_dir = Path(temp_dir) / "audit"
+            payload = run_layer1_pipeline(
+                client_id="demo-spacex-001",
+                limit=10,
+                live=False,
+                audit_log_dir=audit_dir,
+            )
+            audit_file = audit_dir / "demo-spacex-001.jsonl"
+            records = [json.loads(line) for line in audit_file.read_text().splitlines()]
+
+            self.assertEqual(len(records), len(payload["raw_signals"]))
+            self.assertEqual(
+                len([record for record in records if record["decision"] == "accepted"]),
+                len(payload["drift_events"]),
+            )
+            self.assertEqual(
+                len([record for record in records if record["decision"] == "dropped"]),
+                len(payload["dropped_signals"]),
+            )
+            self.assertTrue(all(record["schema_version"] == "layer1.audit.v1" for record in records))
+
     def test_replay_round_trip_does_not_require_live_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             replay_dir = Path(temp_dir)
@@ -65,6 +116,33 @@ class Layer1PipelineTests(unittest.TestCase):
                     for event in replayed["drift_events"]
                 )
             )
+
+    def test_stable_drops_feed_vae_snapshot_buffer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            snapshot_dir = Path(temp_dir) / "vae_snapshots"
+            first_run = run_layer1_pipeline(
+                client_id="demo-spacex-001",
+                limit=10,
+                live=False,
+                vae_snapshot_dir=snapshot_dir,
+            )
+
+            self.assertEqual(len(first_run["dropped_signals"]), 1)
+            self.assertTrue(first_run["dropped_signals"][0]["vae_snapshot_saved"])
+            self.assertEqual((snapshot_dir / "demo-spacex-001.jsonl").read_text().count("\n"), 1)
+
+            second_run = run_layer1_pipeline(
+                client_id="demo-spacex-001",
+                limit=10,
+                live=False,
+                vae_snapshot_dir=snapshot_dir,
+            )
+            snapshot_counts = [
+                event["loop_a_trace"]["nominal_profile"]["time_series_snapshots"]
+                for event in second_run["drift_events"]
+            ]
+
+            self.assertTrue(all(count >= 1 for count in snapshot_counts))
 
     def test_replay_irrelevant_signal_has_specific_drop_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
