@@ -473,7 +473,31 @@ def post_action(alert_id: str, body: dict[str, Any] = Body(...)) -> dict[str, An
 
 @app.get("/api/graph")
 def get_graph() -> dict[str, Any]:
-    return STATIC_GRAPH
+    # Merge live pipeline drift scores into graph nodes
+    live_scores: dict[str, tuple[int, str]] = {}
+    for client_id in PORTFOLIO_CLIENT_IDS:
+        result = _get_pipeline(client_id)
+        events = result.get("drift_events", [])
+        if events:
+            max_score = max((e.get("drift_score", 0) for e in events), default=0)
+            score_int = min(int(max_score * 100), 100)
+            status = "high" if score_int >= 80 else "elevated" if score_int >= 60 else "medium"
+            # map client_id back to graph node id
+            node_id = next((k for k, v in CUSTOMER_TO_CLIENT_ID.items() if v == client_id), None)
+            if node_id:
+                live_scores[node_id] = (score_int, status)
+
+    nodes = []
+    for node in STATIC_GRAPH["nodes"]:
+        n = dict(node)
+        if n["id"] in live_scores:
+            score, status = live_scores[n["id"]]
+            n["driftScore"] = score
+            n["riskStatus"] = status
+            n["lastUpdated"] = "live"
+        nodes.append(n)
+
+    return {"nodes": nodes, "edges": STATIC_GRAPH["edges"]}
 
 
 @app.get("/api/logs")
