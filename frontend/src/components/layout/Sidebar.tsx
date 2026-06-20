@@ -1,11 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, PieChart } from "lucide-react";
+import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, PieChart, BookOpen } from "lucide-react";
 import { HydraLogo } from "@/components/HydraLogo";
 import { getAlerts } from "@/lib/services";
 
 type NavItem = {
-  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/portfolio";
+  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/portfolio" | "/documentation";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
@@ -19,7 +19,9 @@ const navBase: NavItem[] = [
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/logs", label: "Logs", icon: Terminal },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/documentation", label: "Documentation", icon: BookOpen },
 ];
+
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

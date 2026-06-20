@@ -1,4 +1,4 @@
-# analytic_engine/graph_fusion.p
+# analytic_engine/graph_fusion.py
 from pydantic import BaseModel, Field
 from typing import List, Literal
 from neo4j import GraphDatabase
@@ -23,12 +23,13 @@ class TemporalGraphFusionEngine:
         """
         Connects directly to the live Neo4j Aura cloud instance tracking risk topology.
         """
-        uri = f"neo4j+s://{os.getenv("NEO4J_USERNAME", "neo4j")}.databases.neo4j.io"
-        user = os.getenv("NEO4J_USERNAME", "neo4j")
+        # Dynamic extraction matching the username/instance ID contract mapping
+        username = os.getenv("NEO4J_USERNAME", "neo4j")
+        uri = f"neo4j+s://{username}.databases.neo4j.io"
         password = os.getenv("NEO4J_PASSWORD", "password_dev")
 
         try:
-            self.driver = GraphDatabase.driver(uri, auth=(user, password))
+            self.driver = GraphDatabase.driver(uri, auth=(username, password))
             self.driver.verify_connectivity()
             print("Successfully connected to live Neo4j Database instance.")
         except Exception as e:
@@ -56,24 +57,25 @@ class TemporalGraphFusionEngine:
         try:
             with self.driver.session() as session:
                 for triple in resolution.detected_triples:
-                    # Explicit dictionary parameter extraction to guarantee syntax parsing on Aura
                     parameters = {
                         "subject_param": triple.subject,
                         "object_param": triple.object,
                         "timestamp_param": timestamp
                     }
 
+                    # Using apoc or clean inline replacement because relationship types can't be parameterized directly
+                    safe_predicate = "".join([c for c in triple.predicate if c.isalnum() or c == "_"]).upper()
+
                     if triple.modification_type == "ADDED":
-                        # Updated to handle standard relation injections via clean runtime parameters
-                        query = """
-                        MERGE (s:Entity {name: $subject_param})
-                        MERGE (o:Entity {name: $object_param})
-                        MERGE (s)-[r:RELATION {type: 'PIVOT'}]->(o)
+                        query = f"""
+                        MERGE (s:Entity {{name: $subject_param}})
+                        MERGE (o:Entity {{name: $object_param}})
+                        MERGE (s)-[r:{safe_predicate}]->(o)
                         SET r.updated_at = $timestamp_param, r.state = 'ACTIVE'
                         """
                     elif triple.modification_type == "DELETED":
-                        query = """
-                        MATCH (s:Entity {name: $subject_param})-[r:RELATION]->(o:Entity {name: $object_param})
+                        query = f"""
+                        MATCH (s:Entity {{name: $subject_param}})-[r:{safe_predicate}]->(o:Entity {{name: $object_param}})
                         SET r.updated_at = $timestamp_param, r.state = 'DEPRECATED'
                         """
                     else:
@@ -81,8 +83,13 @@ class TemporalGraphFusionEngine:
 
                     session.run(query, parameters)
 
+                # Fetch real active counts to avoid static variables cascading to Layer 3
+                count_res = session.run("MATCH ()-[r]->() WHERE r.state = 'ACTIVE' RETURN count(r) as active_count")
+                record = count_res.single()
+                active_edges = float(record["active_count"]) if record else 12.0
+
                 return {
-                    "total_active_edges": 12.0,
+                    "total_active_edges": active_edges,
                     "triples_added_count": float(added_count),
                     "triples_deleted_count": float(deleted_count)
                 }

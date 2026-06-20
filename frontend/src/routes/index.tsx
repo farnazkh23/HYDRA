@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ShieldAlert, Users, TrendingUp, Radio } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -150,21 +150,23 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Latest alert
+                <Link to="/alerts">
+                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+                      Latest alert
+                    </div>
+                    {lastAlert ? (
+                      <>
+                        <div className="text-sm font-medium">{lastAlert.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {lastAlert.driftType} · {lastAlert.timestamp}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No recent alerts.</div>
+                    )}
                   </div>
-                  {lastAlert ? (
-                    <>
-                      <div className="text-sm font-medium">{lastAlert.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {lastAlert.driftType} · {lastAlert.timestamp}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No recent alerts.</div>
-                  )}
-                </div>
+                </Link>
               </>
             ) : (
               <div className="text-sm text-muted-foreground">
