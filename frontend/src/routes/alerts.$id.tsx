@@ -87,17 +87,17 @@ function InvestigationPage() {
         if (!a) { setLoading(false); return; }
         setAlert(a as Alert);
         setStatus(((a as Alert).status as CaseStatus) ?? "open");
-        const [t, d, g] = await Promise.all([
+        const [t, d, g] = await Promise.allSettled([
           getReasoningTrace((a as Alert).id),
           getKYCDriftRecord((a as Alert).customerId),
           getGovernanceRecord((a as Alert).id),
         ]);
         if (cancelled) return;
-        setTrace(t ?? null);
-        setDrift(d ?? null);
-        setGov(g ?? null);
+        setTrace(t.status === "fulfilled" ? t.value ?? null : null);
+        setDrift(d.status === "fulfilled" ? d.value ?? null : null);
+        setGov(g.status === "fulfilled" ? g.value ?? null : null);
       } catch {
-        // alert not found or fetch error — show not-found state
+        // alert not found
       } finally {
         if (!cancelled) setLoading(false);
       }
