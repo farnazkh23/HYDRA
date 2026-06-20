@@ -1,0 +1,38 @@
+{
+  "global_high_risk_keywords": [
+    "investigation",
+    "export control",
+    "national security",
+    "regulatory action",
+    "regulatory exposure",
+    "export compliance exposure",
+    "beneficial owner",
+    "offshore",
+    "fraud",
+    "lawsuit",
+    "governance",
+    "crypto",
+    "market manipulation"
+  ],
+  "persona_high_risk_keywords": {
+    "demo-spacex-001": [
+      "launch mishap",
+      "faa investigation",
+      "wildlife refuge"
+    ],
+    "demo-apple-001": [
+      "antitrust investigation",
+      "app store lawsuit",
+      "privacy complaint",
+      "supply chain diversion",
+      "labor complaint"
+    ],
+    "demo-tesla-001": [
+      "autopilot investigation",
+      "recall",
+      "labor complaint",
+      "self-driving crash",
+      "battery fire"
+    ]
+  }
+}

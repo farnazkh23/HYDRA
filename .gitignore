@@ -4,6 +4,7 @@ __pycache__/
 .DS_Store
 data/layer1_replay/
 data/layer1_vae_snapshots/
+data/layer1_audit_logs/
 
 # Local backups
 frontend_backup_*/
@@ -31,3 +32,4 @@ frontend/.env.development.local
 frontend/.env.production.local
 data/layer1_replay*/
 data/layer1_vae_snapshots*/
+data/layer1_audit_logs*/

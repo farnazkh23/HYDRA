@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 # --- LAYER 1 INFRASTRUCTURE IMPORTS ---
+from backend.audit import append_layer1_audit_record
 from backend.collectors.news import EventRegistryNewsCollector, dedupe_signals
 from backend.kyc.store import load_layer1_baselines
 from backend.models import Layer1KycBaseline, RawSignal
@@ -27,6 +28,7 @@ from analytic_engine.time_series import InternalTelemetryEngine
 
 DEFAULT_REPLAY_DIR = Path("data/layer1_replay")
 DEFAULT_VAE_SNAPSHOT_DIR = Path("data/layer1_vae_snapshots")
+DEFAULT_AUDIT_LOG_DIR = Path("data/layer1_audit_logs")
 LIVE_NEWS_QUERY_COST_UNITS = 1.0
 MOCK_NEWS_QUERY_COST_UNITS = 0.0
 
@@ -105,7 +107,7 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
     return final_audit_log
 
 
-# --- LAYER 1 INFRASTRUCTURE WITH SNAPSHOT ARCHIVING ---
+# --- LAYER 1 INFRASTRUCTURE WITH SNAPSHOT & LOCAL AUDIT ARCHIVING ---
 def run_layer1(client_id: str, limit: int, live: bool = False, replay_file: str | None = None) -> list[dict]:
     return run_layer1_pipeline(
         client_id=client_id,
@@ -122,6 +124,7 @@ def run_layer1_pipeline(
     replay_file: str | None = None,
     expand_adverse_news: bool = False,
     vae_snapshot_dir: str | Path | None = None,
+    audit_log_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     baselines = load_layer1_baselines()
     baseline = baselines[client_id]
@@ -140,7 +143,25 @@ def run_layer1_pipeline(
     for signal in signals:
         event = drift_engine.score_signal(baseline, signal)
         if event:
-            events.append(model_to_json_dict(event))
+            event_payload = model_to_json_dict(event)
+            events.append(event_payload)
+            append_layer1_audit_record(
+                audit_log_dir=audit_log_dir,
+                client_id=baseline.client_id,
+                record={
+                    "decision": "accepted",
+                    "event_id": event_payload["event_id"],
+                    "severity": event_payload["severity"],
+                    "drift_score": event_payload["drift_score"],
+                    "routing_hint": event_payload["routing_hint"],
+                    "title": event_payload["citations"][0].get("title", ""),
+                    "source": signal.source,
+                    "matched_risk_terms": event_payload["matched_risk_terms"],
+                    "scoring_breakdown": event_payload["scoring_breakdown"],
+                    "loop_a_trace": event_payload["loop_a_trace"],
+                    "source_metadata": event_payload["source_metadata"],
+                },
+            )
         else:
             drop_reason = _drop_reason(baseline, signal)
             snapshot_saved = False
@@ -172,6 +193,22 @@ def run_layer1_pipeline(
                     "vae_snapshot_saved": snapshot_saved,
                     "timestamp": signal.timestamp.isoformat(),
                 }
+            )
+            append_layer1_audit_record(
+                audit_log_dir=audit_log_dir,
+                client_id=baseline.client_id,
+                record={
+                    "decision": "dropped",
+                    "drop_reason": drop_reason,
+                    "vae_snapshot_saved": snapshot_saved,
+                    "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
+                    "source": signal.source,
+                    "signal_type": signal.signal_type.value
+                    if hasattr(signal.signal_type, "value")
+                    else str(signal.signal_type),
+                    "timestamp": signal.timestamp.isoformat(),
+                    "relevance_gate": evaluate_relevance(baseline, signal).__dict__,
+                },
             )
     _assign_event_cost_units(
         events=events,
@@ -309,6 +346,11 @@ def main() -> None:
         help="Directory for stable feature snapshots used by the lightweight VAE time-series buffer.",
     )
     parser.add_argument(
+        "--audit-log-dir",
+        default=str(DEFAULT_AUDIT_LOG_DIR),
+        help="Directory for Layer 1 accepted/dropped signal audit logs.",
+    )
+    parser.add_argument(
         "--write-replay-dir",
         nargs="?",
         const=str(DEFAULT_REPLAY_DIR),
@@ -316,7 +358,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 1. Execute upstream Layer 1 data ingestion with baseline snapshotting
+    # 1. Execute upstream Layer 1 data ingestion with baseline snapshotting and audit logging
     payload = run_layer1_pipeline(
         client_id=args.client_id,
         limit=args.limit,
@@ -324,6 +366,7 @@ def main() -> None:
         replay_file=args.replay_file,
         expand_adverse_news=args.expand_adverse_news,
         vae_snapshot_dir=args.vae_snapshot_dir,
+        audit_log_dir=args.audit_log_dir,
     )
 
     if args.write_replay_dir:
