@@ -282,8 +282,8 @@ No open P0 items.
 ### P1
 
 1. Replace local SPLADE-style sparse features with true SPLADE if needed.
-2. Add a streaming/scheduler loop with bounded queue/backpressure so Loop A can be described as high-throughput instead of one-shot CLI only.
-3. Add latency/throughput benchmarks for Loop A filtering so we can validate the high-frequency/sub-millisecond edge-layer claim.
+2. Add streaming/scheduler loop with bounded queue/backpressure. (for now is one-shot CLI only)
+3. Add latency/throughput benchmark.
 
 ### P2
 
