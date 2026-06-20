@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/layer1_replay/
+
+# Local backups
+frontend_backup_*/
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+build/
+.next/
+frontend/dist/
+frontend/build/
+frontend/.next/
+
+# Env files
+.env
+.env.local
+.env.development.local
+.env.production.local
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.production.local
+data/layer1_replay*/
