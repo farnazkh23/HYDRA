@@ -16,6 +16,7 @@ from backend.models import Layer1KycBaseline, RawSignal
 from backend.replay import load_raw_signals, model_to_json_dict, write_jsonl, write_raw_signals
 from stream_engine.drift_engine import KeywordDriftEngine
 from stream_engine.relevance import evaluate_relevance
+from stream_engine.vae_snapshots import append_nominal_snapshot
 
 # --- LAYER 2 ANALYTIC INFRASTRUCTURE IMPORTS ---
 from analytic_engine.datasets import ComplianceMultiModalDataset
@@ -25,6 +26,7 @@ from analytic_engine.router import CostAwareCascadingRouter
 from analytic_engine.time_series import InternalTelemetryEngine
 
 DEFAULT_REPLAY_DIR = Path("data/layer1_replay")
+DEFAULT_VAE_SNAPSHOT_DIR = Path("data/layer1_vae_snapshots")
 LIVE_NEWS_QUERY_COST_UNITS = 1.0
 MOCK_NEWS_QUERY_COST_UNITS = 0.0
 
@@ -103,17 +105,23 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
     return final_audit_log
 
 
-# --- LAYER 1 WORKING INFRASTRUCTURE ---
+# --- LAYER 1 INFRASTRUCTURE WITH SNAPSHOT ARCHIVING ---
 def run_layer1(client_id: str, limit: int, live: bool = False, replay_file: str | None = None) -> list[dict]:
-    return run_layer1_pipeline(client_id=client_id, limit=limit, live=live, replay_file=replay_file)["drift_events"]
+    return run_layer1_pipeline(
+        client_id=client_id,
+        limit=limit,
+        live=live,
+        replay_file=replay_file,
+    )["drift_events"]
 
 
 def run_layer1_pipeline(
-        client_id: str,
-        limit: int,
-        live: bool = False,
-        replay_file: str | None = None,
-        expand_adverse_news: bool = False,
+    client_id: str,
+    limit: int,
+    live: bool = False,
+    replay_file: str | None = None,
+    expand_adverse_news: bool = False,
+    vae_snapshot_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     baselines = load_layer1_baselines()
     baseline = baselines[client_id]
@@ -125,7 +133,7 @@ def run_layer1_pipeline(
         expand_adverse_news=expand_adverse_news,
     )
     signals = dedupe_signals(signals)
-    drift_engine = KeywordDriftEngine()
+    drift_engine = KeywordDriftEngine(vae_snapshot_dir=vae_snapshot_dir)
 
     events = []
     dropped_signals = []
@@ -134,6 +142,23 @@ def run_layer1_pipeline(
         if event:
             events.append(model_to_json_dict(event))
         else:
+            drop_reason = _drop_reason(baseline, signal)
+            snapshot_saved = False
+            if drop_reason == "stable_below_drift_threshold":
+                snapshot_saved = append_nominal_snapshot(
+                    client_id=baseline.client_id,
+                    snapshot_dir=vae_snapshot_dir,
+                    feature_vector=drift_engine.nominal_snapshot_for_signal(baseline, signal),
+                    metadata={
+                        "source": signal.source,
+                        "signal_type": signal.signal_type.value
+                        if hasattr(signal.signal_type, "value")
+                        else str(signal.signal_type),
+                        "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
+                        "provider": str(signal.metadata.get("provider", "")),
+                        "drop_reason": drop_reason,
+                    },
+                )
             dropped_signals.append(
                 {
                     "client_id": signal.client_id,
@@ -143,7 +168,8 @@ def run_layer1_pipeline(
                     else str(signal.signal_type),
                     "source": signal.source,
                     "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
-                    "drop_reason": _drop_reason(baseline, signal),
+                    "drop_reason": drop_reason,
+                    "vae_snapshot_saved": snapshot_saved,
                     "timestamp": signal.timestamp.isoformat(),
                 }
             )
@@ -170,11 +196,11 @@ def run_layer1_pipeline(
 
 
 def _load_or_collect_signals(
-        baseline: Layer1KycBaseline,
-        limit: int,
-        live: bool,
-        replay_file: str | None,
-        expand_adverse_news: bool,
+    baseline: Layer1KycBaseline,
+    limit: int,
+    live: bool,
+    replay_file: str | None,
+    expand_adverse_news: bool,
 ) -> tuple[list[RawSignal], int]:
     if replay_file:
         return load_raw_signals(replay_file, client_id=baseline.client_id)[:limit], 0
@@ -207,10 +233,10 @@ def _write_replay_outputs(output_dir: str | Path, payload: dict[str, Any]) -> No
 
 
 def _assign_event_cost_units(
-        events: list[dict[str, Any]],
-        live: bool,
-        replay_file: str | None,
-        news_queries: int,
+    events: list[dict[str, Any]],
+    live: bool,
+    replay_file: str | None,
+    news_queries: int,
 ) -> None:
     if not events:
         return
@@ -226,13 +252,13 @@ def _assign_event_cost_units(
 
 
 def _build_layer1_metrics(
-        client_id: str,
-        signals: list[RawSignal],
-        events: list[dict[str, Any]],
-        dropped_signals: list[dict[str, Any]],
-        live: bool,
-        replay_file: str | None,
-        news_queries: int,
+    client_id: str,
+    signals: list[RawSignal],
+    events: list[dict[str, Any]],
+    dropped_signals: list[dict[str, Any]],
+    live: bool,
+    replay_file: str | None,
+    news_queries: int,
 ) -> dict[str, Any]:
     processed = len(signals)
     emitted = len(events)
@@ -278,6 +304,11 @@ def main() -> None:
         "--replay-file", help="Read RawSignal records from a JSONL replay file instead of collecting news."
     )
     parser.add_argument(
+        "--vae-snapshot-dir",
+        default=str(DEFAULT_VAE_SNAPSHOT_DIR),
+        help="Directory for stable feature snapshots used by the lightweight VAE time-series buffer.",
+    )
+    parser.add_argument(
         "--write-replay-dir",
         nargs="?",
         const=str(DEFAULT_REPLAY_DIR),
@@ -285,19 +316,20 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # 1. Execute upstream Layer 1 data ingestion
+    # 1. Execute upstream Layer 1 data ingestion with baseline snapshotting
     payload = run_layer1_pipeline(
         client_id=args.client_id,
         limit=args.limit,
         live=args.live,
         replay_file=args.replay_file,
         expand_adverse_news=args.expand_adverse_news,
+        vae_snapshot_dir=args.vae_snapshot_dir,
     )
 
     if args.write_replay_dir:
         _write_replay_outputs(args.write_replay_dir, payload)
 
-    # Print baseline tracking metrics as expected by Layer 1 contracts
+    # Print tracking metrics as expected by frontend hooks
     print(
         json.dumps(
             {
@@ -316,7 +348,7 @@ def main() -> None:
         print("\n✅ Layer 1 Scan Complete: No profile anomalies crossed threshold boundaries.")
         return
 
-    # Build transaction time-series history data frame mapping to dormancy break metrics
+    # Build transaction time-series history dataframe mapping to volume metrics
     dates = pd.date_range(start="2026-05-01", end="2026-06-20", freq="D")
     volumes = [150 if i < (len(dates) - 1) else 2500000 for i in range(len(dates))]
     history_df = pd.DataFrame({"timestamp": dates, "value": volumes})

@@ -66,6 +66,33 @@ class Layer1PipelineTests(unittest.TestCase):
                 )
             )
 
+    def test_stable_drops_feed_vae_snapshot_buffer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            snapshot_dir = Path(temp_dir) / "vae_snapshots"
+            first_run = run_layer1_pipeline(
+                client_id="demo-spacex-001",
+                limit=10,
+                live=False,
+                vae_snapshot_dir=snapshot_dir,
+            )
+
+            self.assertEqual(len(first_run["dropped_signals"]), 1)
+            self.assertTrue(first_run["dropped_signals"][0]["vae_snapshot_saved"])
+            self.assertEqual((snapshot_dir / "demo-spacex-001.jsonl").read_text().count("\n"), 1)
+
+            second_run = run_layer1_pipeline(
+                client_id="demo-spacex-001",
+                limit=10,
+                live=False,
+                vae_snapshot_dir=snapshot_dir,
+            )
+            snapshot_counts = [
+                event["loop_a_trace"]["nominal_profile"]["time_series_snapshots"]
+                for event in second_run["drift_events"]
+            ]
+
+            self.assertTrue(all(count >= 1 for count in snapshot_counts))
+
     def test_replay_irrelevant_signal_has_specific_drop_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             replay_dir = Path(temp_dir)

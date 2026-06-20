@@ -114,12 +114,26 @@ class KeywordDriftEngineTests(unittest.TestCase):
         self.assertEqual(event.loop_a_trace["trace_mode"], "vae_compatible_proxy")
         self.assertIn(
             event.loop_a_trace["reconstruction_engine"],
-            {"local_pca_reconstruction", "vae_compatible_statistical_proxy"},
+            {
+                "lightweight_vae_reconstruction",
+                "local_pca_reconstruction",
+                "vae_compatible_statistical_proxy",
+            },
         )
         self.assertEqual(event.loop_a_trace["vae_reconstruction_error"], 1.0)
         self.assertEqual(event.loop_a_trace["drift_threshold"], 0.35)
         self.assertIn("nominal_mean", event.loop_a_trace["nominal_profile"])
         self.assertIn("fit_mode", event.loop_a_trace["nominal_profile"])
+        if event.loop_a_trace["reconstruction_engine"] == "lightweight_vae_reconstruction":
+            self.assertEqual(
+                event.loop_a_trace["nominal_profile"]["fit_mode"],
+                "lightweight_vae_baseline_80_20",
+            )
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["latent_dimensions"], 2)
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["train_samples"], 8)
+            self.assertEqual(event.loop_a_trace["nominal_profile"]["validation_samples"], 2)
+            self.assertIn("vae_loss", event.loop_a_trace["nominal_profile"])
+            self.assertIn("fallback_engine", event.loop_a_trace["nominal_profile"])
         self.assertIn("dynamic_threshold", event.scoring_breakdown)
         self.assertIn("reconstruction_error", event.scoring_breakdown)
         self.assertEqual(event.scoring_breakdown["relevance_score"], 1.0)

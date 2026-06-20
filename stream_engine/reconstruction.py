@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import sqrt
+from pathlib import Path
 
 from backend.models import Layer1KycBaseline
+from stream_engine.vae_snapshots import load_nominal_snapshots
 from stream_engine.vectorizer import DenseFeatureVector, HybridFeatureVector, SparseFeatureVector
 
 
@@ -137,7 +139,159 @@ class LocalPCAReconstructionEngine:
         )
 
 
-def build_default_reconstruction_engine() -> LocalPCAReconstructionEngine | VAECompatibleReconstructionEngine:
+class LightweightVAEReconstructionEngine:
+    """Tiny local VAE trained on nominal baseline feature samples."""
+
+    def __init__(self, snapshot_dir: str | Path | None = None) -> None:
+        import numpy as np
+
+        self._np = np
+        self.snapshot_dir = snapshot_dir
+        self._pca_fallback = LocalPCAReconstructionEngine()
+
+    def evaluate(
+        self,
+        baseline: Layer1KycBaseline,
+        sparse_features: SparseFeatureVector,
+        dense_features: DenseFeatureVector,
+        hybrid_features: HybridFeatureVector,
+        heuristic_score: float,
+        threshold_floor: float,
+    ) -> ReconstructionResult:
+        nominal_profile = _fit_nominal_profile(baseline)
+        baseline_samples = _nominal_feature_samples(nominal_profile)
+        time_series_snapshots = load_nominal_snapshots(
+            client_id=baseline.client_id,
+            snapshot_dir=self.snapshot_dir,
+        )
+        samples = self._np.asarray([*baseline_samples, *time_series_snapshots], dtype=float)
+        train_samples, validation_samples = _train_validation_split(samples, validation_ratio=0.2)
+        feature_vector = self._np.asarray(
+            build_reconstruction_feature_vector(
+                sparse_features=sparse_features,
+                dense_features=dense_features,
+                hybrid_features=hybrid_features,
+                heuristic_score=heuristic_score,
+            ),
+            dtype=float,
+        )
+        model = self._fit_vae(train_samples)
+        validation_losses = [
+            self._reconstruction_loss(validation_sample, model)
+            for validation_sample in validation_samples
+        ]
+        validation_mean = float(self._np.mean(validation_losses))
+        validation_std = float(self._np.std(validation_losses))
+        learned_threshold = validation_mean + (2 * validation_std)
+        vae_loss = self._reconstruction_loss(feature_vector, model)
+        vae_error = min(1.0, vae_loss * 8)
+        fallback = self._pca_fallback.evaluate(
+            baseline=baseline,
+            sparse_features=sparse_features,
+            dense_features=dense_features,
+            hybrid_features=hybrid_features,
+            heuristic_score=heuristic_score,
+            threshold_floor=threshold_floor,
+        )
+        if not sparse_features.matched_risk_terms:
+            return ReconstructionResult(
+                engine="lightweight_vae_reconstruction",
+                reconstruction_error=fallback.reconstruction_error,
+                drift_threshold=fallback.drift_threshold,
+                dynamic_variance=fallback.dynamic_variance,
+                drift_detected=fallback.drift_detected,
+                decision=fallback.decision,
+                nominal_profile={
+                    **nominal_profile,
+                    "fit_mode": "lightweight_vae_baseline_80_20",
+                    "latent_dimensions": 2,
+                    "train_samples": len(train_samples),
+                    "validation_samples": len(validation_samples),
+                    "start_point_samples": len(baseline_samples),
+                    "time_series_snapshots": len(time_series_snapshots),
+                    "validation_loss_mean": round(validation_mean, 4),
+                    "validation_loss_std": round(validation_std, 4),
+                    "vae_loss": round(vae_loss, 4),
+                    "safety_gate": "no_risk_terms_used_pca_fallback",
+                },
+            )
+
+        drift_threshold = round(max(threshold_floor, min(0.95, learned_threshold * 8)), 3)
+        reconstruction_error = round(max(fallback.reconstruction_error, vae_error), 3)
+        drift_detected = reconstruction_error >= drift_threshold
+        return ReconstructionResult(
+            engine="lightweight_vae_reconstruction",
+            reconstruction_error=reconstruction_error,
+            drift_threshold=drift_threshold,
+            dynamic_variance=round(validation_std**2, 4),
+            drift_detected=drift_detected,
+            decision="DRIFT_EVENT emitted" if drift_detected else "Signal dropped — stable",
+            nominal_profile={
+                **nominal_profile,
+                "fit_mode": "lightweight_vae_baseline_80_20",
+                "latent_dimensions": 2,
+                "train_samples": len(train_samples),
+                "validation_samples": len(validation_samples),
+                "start_point_samples": len(baseline_samples),
+                "time_series_snapshots": len(time_series_snapshots),
+                "validation_loss_mean": round(validation_mean, 4),
+                "validation_loss_std": round(validation_std, 4),
+                "vae_loss": round(vae_loss, 4),
+                "fallback_engine": fallback.engine,
+            },
+        )
+
+    def _fit_vae(self, train_samples: object) -> dict[str, object]:
+        np = self._np
+        rng = np.random.default_rng(7)
+        input_dimensions = train_samples.shape[1]
+        latent_dimensions = 2
+        model = {
+            "w_mu": rng.normal(0, 0.08, size=(input_dimensions, latent_dimensions)),
+            "b_mu": np.zeros(latent_dimensions),
+            "w_logvar": rng.normal(0, 0.02, size=(input_dimensions, latent_dimensions)),
+            "b_logvar": np.zeros(latent_dimensions),
+            "w_decoder": rng.normal(0, 0.08, size=(latent_dimensions, input_dimensions)),
+            "b_decoder": train_samples.mean(axis=0),
+        }
+        learning_rate = 0.08
+        beta = 0.03
+        for _ in range(220):
+            mu = train_samples @ model["w_mu"] + model["b_mu"]
+            logvar = np.clip(train_samples @ model["w_logvar"] + model["b_logvar"], -4, 4)
+            reconstruction = mu @ model["w_decoder"] + model["b_decoder"]
+            reconstruction_grad = 2 * (reconstruction - train_samples) / train_samples.size
+            decoder_grad = mu.T @ reconstruction_grad
+            decoder_bias_grad = reconstruction_grad.sum(axis=0)
+            mu_grad = reconstruction_grad @ model["w_decoder"].T
+            mu_grad += beta * mu / len(train_samples)
+            logvar_grad = beta * 0.5 * (np.exp(logvar) - 1) / len(train_samples)
+
+            model["w_decoder"] -= learning_rate * decoder_grad
+            model["b_decoder"] -= learning_rate * decoder_bias_grad
+            model["w_mu"] -= learning_rate * (train_samples.T @ mu_grad)
+            model["b_mu"] -= learning_rate * mu_grad.sum(axis=0)
+            model["w_logvar"] -= learning_rate * (train_samples.T @ logvar_grad)
+            model["b_logvar"] -= learning_rate * logvar_grad.sum(axis=0)
+        return model
+
+    def _reconstruction_loss(self, feature_vector: object, model: dict[str, object]) -> float:
+        np = self._np
+        vector = np.asarray(feature_vector, dtype=float)
+        mu = vector @ model["w_mu"] + model["b_mu"]
+        reconstruction = mu @ model["w_decoder"] + model["b_decoder"]
+        return float(np.mean((reconstruction - vector) ** 2))
+
+
+def build_default_reconstruction_engine(
+    snapshot_dir: str | Path | None = None,
+) -> (
+    LightweightVAEReconstructionEngine | LocalPCAReconstructionEngine | VAECompatibleReconstructionEngine
+):
+    try:
+        return LightweightVAEReconstructionEngine(snapshot_dir=snapshot_dir)
+    except Exception:
+        pass
     try:
         return LocalPCAReconstructionEngine()
     except Exception:
@@ -171,7 +325,7 @@ def _semantic_residual_bonus(
     return min(0.04, max(0.0, dense_features.semantic_shift_score - 0.65) * 0.1)
 
 
-def _feature_vector(
+def build_reconstruction_feature_vector(
     sparse_features: SparseFeatureVector,
     dense_features: DenseFeatureVector,
     hybrid_features: HybridFeatureVector,
@@ -188,6 +342,20 @@ def _feature_vector(
     ]
 
 
+def _feature_vector(
+    sparse_features: SparseFeatureVector,
+    dense_features: DenseFeatureVector,
+    hybrid_features: HybridFeatureVector,
+    heuristic_score: float,
+) -> list[float]:
+    return build_reconstruction_feature_vector(
+        sparse_features=sparse_features,
+        dense_features=dense_features,
+        hybrid_features=hybrid_features,
+        heuristic_score=heuristic_score,
+    )
+
+
 def _nominal_feature_samples(nominal_profile: dict[str, float | int | str]) -> list[list[float]]:
     nominal_mean = float(nominal_profile["nominal_mean"])
     nominal_std = float(nominal_profile["nominal_std"])
@@ -197,4 +365,15 @@ def _nominal_feature_samples(nominal_profile: dict[str, float | int | str]) -> l
         [0.0, 0.1, 0.6, 0.12, nominal_mean, nominal_mean + nominal_std, nominal_mean],
         [0.0, 0.2, 0.6, 0.14, nominal_mean + nominal_std, nominal_mean + nominal_std, nominal_mean],
         [0.0, 0.0, 0.3, 0.08, max(0.0, nominal_mean - nominal_std), nominal_mean, nominal_mean],
+        [0.0, 0.1, 0.4, 0.1, nominal_mean, max(0.0, nominal_mean - nominal_std), nominal_mean],
+        [0.0, 0.0, 0.6, 0.09, max(0.0, nominal_mean - nominal_std), nominal_mean, nominal_mean],
+        [0.0, 0.2, 0.4, 0.11, nominal_mean, nominal_mean, nominal_mean + nominal_std],
+        [0.0, 0.1, 0.3, 0.07, nominal_mean + nominal_std, nominal_mean, max(0.0, nominal_mean - nominal_std)],
+        [0.0, 0.0, 0.4, 0.08, nominal_mean, nominal_mean, max(0.0, nominal_mean - nominal_std)],
     ]
+
+
+def _train_validation_split(samples: object, validation_ratio: float) -> tuple[object, object]:
+    validation_count = max(1, round(len(samples) * validation_ratio))
+    split_index = len(samples) - validation_count
+    return samples[:split_index], samples[split_index:]
