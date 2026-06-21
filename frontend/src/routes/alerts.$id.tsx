@@ -264,7 +264,7 @@ function InvestigationPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <KV k="Entity" v={alert.customerName} />
                 <KV k="Signal type" v={alert.driftType} />
-                <KV k="Source" v="OpenCorporates / GLEIF" />
+                <KV k="Source" v={alert.citations?.[0] ?? "EventRegistry News"} />
                 <KV k="Timestamp" v={alert.timestamp} />
               </div>
               <p className="mt-4 text-sm text-foreground/90 border-t border-border pt-3">
