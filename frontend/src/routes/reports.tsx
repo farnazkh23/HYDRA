@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, FileText, User, CheckCircle2, Sparkles, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { getCustomerById, getKYCDriftRecord, getCustomerHistory, getLogs } from "@/lib/services";
+import { getCustomerById, getKYCDriftRecord, getCustomerHistory, getLogs, getCustomers } from "@/lib/services";
 import {
   Select,
   SelectContent,
@@ -82,16 +82,23 @@ type CustomerOption = {
   lastUpdated: string;
 };
 
-const customerOptions: CustomerOption[] = [
-  { id: "spacex", name: "SpaceX", risk: "high", drift: "critical", lastUpdated: "2h ago" },
-  { id: "tesla", name: "Tesla", risk: "elevated", drift: "high", lastUpdated: "5h ago" },
-  { id: "amazon", name: "Amazon", risk: "medium", drift: "medium", lastUpdated: "1d ago" },
-  { id: "nvidia", name: "NVIDIA", risk: "medium", drift: "low", lastUpdated: "3h ago" },
-  { id: "binance", name: "Binance Holdings", risk: "high", drift: "critical", lastUpdated: "1h ago" },
-  { id: "openai", name: "OpenAI", risk: "elevated", drift: "high", lastUpdated: "6h ago" },
-  { id: "apple", name: "Apple", risk: "low", drift: "low", lastUpdated: "2d ago" },
-  { id: "meta", name: "Meta", risk: "medium", drift: "medium", lastUpdated: "8h ago" },
-];
+function useCustomerOptions(): CustomerOption[] {
+  const [options, setOptions] = useState<CustomerOption[]>([]);
+  useEffect(() => {
+    getCustomers().then((customers) =>
+      setOptions(
+        customers.map((c) => ({
+          id: c.id,
+          name: c.companyName,
+          risk: c.riskStatus as RiskStatus,
+          drift: c.driftSeverity as DriftSeverity,
+          lastUpdated: c.lastUpdated,
+        })),
+      ),
+    );
+  }, []);
+  return options;
+}
 
 const driftLabel: Record<DriftSeverity, string> = {
   low: "Low drift",
@@ -164,6 +171,7 @@ function SectionHeader({ kicker, title, desc }: { kicker: string; title: string;
 }
 
 function CustomerReportCard() {
+  const customerOptions = useCustomerOptions();
   const [customerId, setCustomerId] = useState<string>("");
   const [prepared, setPrepared] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
