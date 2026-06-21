@@ -62,10 +62,10 @@ class EventRegistryNewsCollector:
         self.expand_adverse_queries = expand_adverse_queries
         self.last_query_count = 0
 
-    def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10, days_back: int = 2) -> list[RawSignal]:
+    def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10, days_back: int = 7) -> list[RawSignal]:
         if not self.enabled:
             self.last_query_count = 0
-            return list(mock_company_news(client_id, company_name))[:limit]
+            return []
 
         date_from = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
         date_to = datetime.utcnow().strftime("%Y-%m-%d")
@@ -89,8 +89,9 @@ class EventRegistryNewsCollector:
             try:
                 with urllib.request.urlopen(url, timeout=8) as response:
                     payload = json.loads(response.read().decode("utf-8"))
-            except Exception:
-                return list(mock_company_news(client_id, company_name))[:limit]
+            except Exception as exc:
+                print(f"[EventRegistry] Request failed for {company_name}: {exc}")
+                continue
 
             self.last_query_count += 1
             signals.extend(
@@ -103,8 +104,7 @@ class EventRegistryNewsCollector:
                     query=query,
                 )
             )
-        signals = dedupe_signals(signals)
-        return signals or list(mock_company_news(client_id, company_name))[:limit]
+        return dedupe_signals(signals)
 
 
 async def fetch_news(client: KYCProfile, days_back: int = 7) -> list[RawSignal]:
