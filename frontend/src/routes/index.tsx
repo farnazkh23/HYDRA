@@ -142,8 +142,8 @@ function Dashboard() {
                   <div className="mt-5">
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {connected.map((c) => (
-                        <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
+                      {connected.map((c, i) => (
+                        <span key={`${c}-${i}`} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
                           {nodes.find((n) => n.id === c)?.label ?? c}
                         </span>
                       ))}
