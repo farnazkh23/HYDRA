@@ -430,20 +430,26 @@ def get_alerts() -> list[dict[str, Any]]:
             alert = _map_alert(event)
             db.upsert_alert(alert)
             stored = db.get_alert(alert["id"])
-            if stored and stored.get("reasoningTrace", {}).get("loop_b") is None:
-                # Run Layer 2 (LLM reasoning)
+            if not stored:
+                continue
+            trace = stored.setdefault("reasoningTrace", {})
+
+            # Run Layer 2 if not done yet
+            if trace.get("loop_b") is None:
                 loop_b = _run_layer2(event)
                 if loop_b:
-                    stored["reasoningTrace"]["loop_b"] = loop_b
+                    trace["loop_b"] = loop_b
                     db.upsert_alert(stored)
-                # Update Neo4j KG (KG-GNN pattern: extract → diff → sanity check → write)
+
+            # Run KG update if not done yet (separate from loop_b so it always fires)
+            if trace.get("kg_update") is None:
                 kg_result = update_kg_from_drift_event(event)
                 if kg_result.get("status") == "applied":
-                    stored["reasoningTrace"]["kg_update"] = kg_result
-                    # Populate graphrag tab from real KG update results
-                    if stored["reasoningTrace"].get("loop_b"):
+                    trace["kg_update"] = kg_result
+                    lb = trace.get("loop_b")
+                    if lb is not None:
                         triples_added = kg_result.get("triples_added", [])
-                        stored["reasoningTrace"]["loop_b"]["graphrag"] = {
+                        lb["graphrag"] = {
                             "new_entity": triples_added[0]["node_to"] if triples_added else "None detected",
                             "triple_status": f"+{kg_result['added']} added  −{kg_result['deleted']} deprecated  ={kg_result['unchanged']} unchanged",
                             "timestamp_slice": event.get("triggered_at", "—"),

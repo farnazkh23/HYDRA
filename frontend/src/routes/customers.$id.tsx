@@ -488,11 +488,17 @@ function EngineAnalysis({ trace }: { trace: AIReasoningTrace }) {
           </Grid>
         )}
         {tab === "graphrag" && (
-          <Grid>
-            <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
-            <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
-            <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
-          </Grid>
+          trace.loop_b?.graphrag ? (
+            <Grid>
+              <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
+              <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
+              <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
+            </Grid>
+          ) : (
+            <div className="text-muted-foreground text-xs py-4 text-center">
+              No KG triples extracted for this event — no structured entity signals detected in drift source.
+            </div>
+          )
         )}
         {tab === "timegpt" && (
           <Grid>
