@@ -584,29 +584,64 @@ def _graph_from_db_kg_updates() -> dict[str, Any] | None:
     return {"nodes": list(nodes.values()), "edges": edges} if nodes else None
 
 
+def _normalise_graph(graph: dict[str, Any], scores: dict[str, tuple[int, str]]) -> dict[str, Any]:
+    """
+    Post-process a raw graph:
+    - Remap company node IDs to match STATIC_CUSTOMERS ids (e.g. "binanceholdings" → "binance")
+    - Apply live drift scores only to company nodes
+    - Deduplicate edges (keep one edge per source→target pair, prefer highest-information rel)
+    """
+    name_to_cust = {c["companyName"]: c for c in STATIC_CUSTOMERS}
+
+    # Remap company node IDs so they match STATIC_CUSTOMERS and alert customerId lookups
+    id_remap: dict[str, str] = {}
+    for node in graph["nodes"]:
+        if node["type"] == "company" and node["label"] in name_to_cust:
+            cust = name_to_cust[node["label"]]
+            correct_id = cust["id"]
+            if node["id"] != correct_id:
+                id_remap[node["id"]] = correct_id
+                node["id"] = correct_id
+            # Overlay real drift scores onto company nodes only
+            s, status = scores.get(correct_id, (cust.get("driftPercent", 0), cust.get("riskStatus", "medium")))
+            node["driftScore"] = s
+            node["riskStatus"] = status
+
+    # Apply remap to edges + deduplicate
+    seen: set[tuple[str, str]] = set()
+    deduped: list[dict] = []
+    for e in graph["edges"]:
+        src = id_remap.get(e["source"], e["source"])
+        tgt = id_remap.get(e["target"], e["target"])
+        pair = (src, tgt)
+        if pair not in seen:
+            seen.add(pair)
+            deduped.append({"source": src, "target": tgt, "relationship": e["relationship"]})
+
+    graph["edges"] = deduped
+    return graph
+
+
 @app.get("/api/graph")
 def get_graph() -> dict[str, Any]:
     scores = _live_drift_scores()
 
-    # 1 — Neo4j live graph (real-time entity relationships from GraphRAG)
+    # 1 — Neo4j live graph
     try:
         from backend.neo4j_client import get_live_graph
         neo4j_graph = get_live_graph([c["companyName"] for c in STATIC_CUSTOMERS])
         if neo4j_graph and neo4j_graph.get("nodes"):
-            neo4j_graph["nodes"] = _overlay_scores(neo4j_graph["nodes"], scores)
-            return neo4j_graph
+            return _normalise_graph(neo4j_graph, scores)
     except Exception as exc:
         print(f"[API] Neo4j unavailable: {exc}", file=sys.stderr)
 
-    # 2 — DB-backed graph from stored KG update triples (real GraphRAG, no Neo4j needed)
+    # 2 — DB-backed graph from stored KG update triples
     db_graph = _graph_from_db_kg_updates()
     if db_graph and db_graph.get("nodes"):
-        db_graph["nodes"] = _overlay_scores(db_graph["nodes"], scores)
-        return db_graph
+        return _normalise_graph(db_graph, scores)
 
-    # 3 — Static fallback with live drift scores
-    nodes = [dict(n) for n in STATIC_GRAPH["nodes"]]
-    nodes = _overlay_scores(nodes, scores)
+    # 3 — Static fallback
+    nodes = _overlay_scores([dict(n) for n in STATIC_GRAPH["nodes"]], scores)
     return {"nodes": nodes, "edges": STATIC_GRAPH["edges"]}
 
 

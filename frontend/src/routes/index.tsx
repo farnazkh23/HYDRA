@@ -69,9 +69,10 @@ function Dashboard() {
 
   const connected = useMemo(() => {
     if (!selected) return [];
-    return edges
+    const ids = edges
       .filter((e) => e.source === selected.id || e.target === selected.id)
       .map((e) => (e.source === selected.id ? e.target : e.source));
+    return [...new Set(ids)]; // deduplicate
   }, [selected, edges]);
 
   const lastAlert = useMemo(() => {
@@ -126,55 +127,78 @@ function Dashboard() {
               Selected node
             </div>
             {selected ? (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-display text-xl font-semibold">{selected.label}</h3>
-                  <RiskBadge level={selected.riskStatus} />
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground capitalize">{selected.type}</div>
-
-                <dl className="mt-5 space-y-3 text-sm">
-                  <Row k="Drift score" v={`${selected.driftScore}%`} />
-                  <Row k="Last update" v={selected.lastUpdated} />
-                  <Row k="Connected entities" v={String(connected.length)} />
-                </dl>
-
-                <div className="mt-5">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-                    Connections
+              selected.type === "company" ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-display text-xl font-semibold">{selected.label}</h3>
+                    <RiskBadge level={selected.riskStatus} />
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {connected.map((c) => (
-                      <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
-                        {nodes.find((n) => n.id === c)?.label ?? c}
-                      </span>
-                    ))}
-                    {connected.length === 0 && (
-                      <span className="text-xs text-muted-foreground">No links yet</span>
-                    )}
-                  </div>
-                </div>
-
-                {lastAlert ? (
-                  <Link to="/alerts/$id" params={{ id: lastAlert.id }}>
-                    <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
-                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
-                      <div className="text-sm font-medium">{lastAlert.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {lastAlert.driftType} · {lastAlert.timestamp}
-                      </div>
+                  <div className="mt-1 text-xs text-muted-foreground">Company</div>
+                  <dl className="mt-5 space-y-3 text-sm">
+                    <Row k="Drift score" v={`${selected.driftScore}%`} />
+                    <Row k="Last update" v={selected.lastUpdated} />
+                    <Row k="Connected entities" v={String(connected.length)} />
+                  </dl>
+                  <div className="mt-5">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {connected.map((c) => (
+                        <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
+                          {nodes.find((n) => n.id === c)?.label ?? c}
+                        </span>
+                      ))}
+                      {connected.length === 0 && <span className="text-xs text-muted-foreground">No links yet</span>}
                     </div>
-                  </Link>
-                ) : (
-                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
-                    <div className="text-xs text-muted-foreground">No recent alerts.</div>
                   </div>
-                )}
-              </>
+                  {lastAlert ? (
+                    <Link to="/alerts/$id" params={{ id: lastAlert.id }}>
+                      <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
+                        <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
+                        <div className="text-sm font-medium">{lastAlert.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{lastAlert.driftType} · {lastAlert.timestamp}</div>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
+                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
+                      <div className="text-xs text-muted-foreground">No alerts in window.</div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-display text-lg font-semibold">{selected.label}</h3>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground capitalize">KG entity · {selected.type}</div>
+                  <div className="mt-5">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Linked to</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {connected.map((c) => {
+                        const n = nodes.find((n) => n.id === c);
+                        return n?.type === "company" ? (
+                          <Link key={c} to="/customers/$id" params={{ id: c }}>
+                            <span className="rounded-md border border-neon/40 bg-neon-soft px-2 py-0.5 text-[11px] text-neon cursor-pointer hover:bg-neon/20">
+                              {n.label}
+                            </span>
+                          </Link>
+                        ) : (
+                          <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
+                            {n?.label ?? c}
+                          </span>
+                        );
+                      })}
+                      {connected.length === 0 && <span className="text-xs text-muted-foreground">No links yet</span>}
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs text-muted-foreground">
+                    This entity was detected via GraphRAG from real news signals.
+                  </div>
+                </>
+              )
             ) : (
               <div className="text-sm text-muted-foreground">
-                Drag any node to inspect. Click to select.
+                Click any node to inspect.
               </div>
             )}
           </aside>
