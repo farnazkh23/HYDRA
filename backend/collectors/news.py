@@ -62,10 +62,13 @@ class EventRegistryNewsCollector:
         self.expand_adverse_queries = expand_adverse_queries
         self.last_query_count = 0
 
-    def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10) -> list[RawSignal]:
+    def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10, days_back: int = 2) -> list[RawSignal]:
         if not self.enabled:
             self.last_query_count = 0
             return list(mock_company_news(client_id, company_name))[:limit]
+
+        date_from = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        date_to = datetime.utcnow().strftime("%Y-%m-%d")
 
         signals: list[RawSignal] = []
         self.last_query_count = 0
@@ -78,6 +81,8 @@ class EventRegistryNewsCollector:
                     "articlesCount": limit,
                     "resultType": "articles",
                     "lang": "eng",
+                    "dateStart": date_from,
+                    "dateEnd": date_to,
                 }
             )
             url = f"{EVENT_REGISTRY_BASE}/article/getArticles?{params}"

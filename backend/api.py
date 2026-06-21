@@ -455,6 +455,7 @@ def get_alerts() -> list[dict[str, Any]]:
                             "timestamp_slice": event.get("triggered_at", "—"),
                         }
                     db.upsert_alert(stored)
+
     return db.get_all_alerts()
 
 
