@@ -74,10 +74,15 @@ function Dashboard() {
       .map((e) => (e.source === selected.id ? e.target : e.source));
   }, [selected, edges]);
 
-  const lastAlert = useMemo(
-    () => (selected ? alerts.find((a) => a.customerId === selected.id) : null),
-    [selected, alerts],
-  );
+  const lastAlert = useMemo(() => {
+    if (!selected) return null;
+    return alerts.find(
+      (a) =>
+        a.customerId === selected.id ||
+        a.customerId.replace("demo-", "").replace(/-001$/, "") === selected.id ||
+        a.customerId.includes(selected.id),
+    );
+  }, [selected, alerts]);
 
   return (
     <AppLayout>
@@ -150,23 +155,22 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <Link to="/alerts">
-                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-                      Latest alert
+                {lastAlert ? (
+                  <Link to="/alerts/$id" params={{ id: lastAlert.id }}>
+                    <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
+                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
+                      <div className="text-sm font-medium">{lastAlert.title}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {lastAlert.driftType} · {lastAlert.timestamp}
+                      </div>
                     </div>
-                    {lastAlert ? (
-                      <>
-                        <div className="text-sm font-medium">{lastAlert.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {lastAlert.driftType} · {lastAlert.timestamp}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">No recent alerts.</div>
-                    )}
+                  </Link>
+                ) : (
+                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
+                    <div className="text-xs text-muted-foreground">No recent alerts.</div>
                   </div>
-                </Link>
+                )}
               </>
             ) : (
               <div className="text-sm text-muted-foreground">
