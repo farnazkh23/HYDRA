@@ -1,6 +1,12 @@
 # HYDRA: Next-Generation Real-Time Financial Risk Intelligence
 > ⏱️ **Short on time?** 
 > If you are a judge on a tight schedule or looking for a quick strategic summary, check out **[README_short.md](README_short.md)** to review HYDRA's key performance metrics, core advantages, and AMINA Bank judging criteria alignment without the technical code setups.
+
+Links:
+
+Video demo: https://drive.google.com/drive/u/0/folders/1K4LmpBWJuaKyv2Eh_hnOsqUdSPXbzLwb 
+
+Clickable demo with high-risk scenarios: https://hydra-insight-desk.lovable.app/ 
 > 
 HYDRA is an enterprise-grade, event-driven risk orchestration system designed specifically for modern institutional compliance. By fusing global public intelligence (OSINT) with a bank's internal data, HYDRA flags hidden financial threats, corporate drift, and compliance risks **days before they result in regulatory breaches, compliance penalties, or financial losses**.
 
