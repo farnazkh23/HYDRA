@@ -8,8 +8,15 @@ from typing import Tuple
 class BaseSurvivalModel(nn.Module):
     def __init__(self, input_dim: int = 4, weights_path: str = None):
         """
-        Unified deep survival module wrapping continuous log-hazard risk scoring.
-        Swappable interface: Pass a valid 'weights_path' to load production-trained weights instantly.
+        Survival-risk proxy / urgency heuristic module wrapping a continuous
+        log-hazard risk score.
+
+        Default behaviour (no weights_path, or CUDA unavailable) runs a
+        heuristic proxy on untrained, seed-pinned weights - it is NOT a
+        trained or calibrated survival model. Swappable interface: pass a
+        valid 'weights_path' (with CUDA available) to load real trained
+        weights instead. A trained, calibrated survival model is on the
+        roadmap, not current default behaviour.
         """
         super().__init__()
 
@@ -43,8 +50,12 @@ class BaseSurvivalModel(nn.Module):
     def calculate_time_to_decay(self, feature_tensor: torch.Tensor) -> Tuple[float, float]:
         """
         Evaluates the non-linear hazard index to output:
-          - T: Calibrated survival days remaining before compliance breakdown.
-          - Uncertainty Bound: Standard error dispersion projection.
+          - T: Survival-risk proxy / urgency heuristic estimate of days
+               remaining before compliance breakdown (calibrated only if
+               real trained weights were loaded via weights_path; otherwise
+               a heuristic estimate, not a statistically calibrated figure).
+          - Uncertainty Bound: A simple heuristic spread derived from the
+               log-hazard magnitude, not a statistical standard error.
         """
         self.eval()
         with torch.no_grad():
@@ -52,8 +63,9 @@ class BaseSurvivalModel(nn.Module):
             raw_network_output = self.forward(feature_tensor).item()
 
             if self.is_mocked:
-                # --- HIGH-FIDELITY PREDICTIVE PROXY MODE ---
-                # Safely simulate weight convergence by scaling against active features
+                # --- SURVIVAL-RISK PROXY MODE (URGENCY HEURISTIC, DEFAULT) ---
+                # Untrained weights; this branch is a rule-based heuristic
+                # scaled against active features, not a calibrated forecast.
                 log_hazard = raw_network_output
 
                 # Check if Loop A / Nixtla flagged an active anomaly spike (X[0] == 1.0)
@@ -62,11 +74,14 @@ class BaseSurvivalModel(nn.Module):
                     mutation_mod = float(feature_tensor[0, 3].item() * 1.5)
                     log_hazard = float(np.abs(log_hazard) + 1.0 + severity_mod + mutation_mod)
             else:
-                # --- PRODUCTION DEPLOYED INFERENCE MODE ---
-                # Uses pure calibrated mathematical neural weights
+                # --- TRAINED-WEIGHTS INFERENCE MODE ---
+                # Uses real trained neural weights loaded via weights_path
+                # (not the default heuristic proxy above).
                 log_hazard = raw_network_output
 
-            # Map log-hazard back to exponential Cox proportional metrics: h(x) = h0 * exp(f(x))
+            # Map log-hazard to an exponential risk-factor heuristic
+            # (Cox-style hazard scaling h(x) = h0 * exp(f(x)) as a proxy form,
+            # not a fitted/calibrated Cox proportional-hazards model).
             risk_factor = np.exp(np.clip(log_hazard, -5.0, 5.0))
 
             base_expected_days = 14.0  # Normalized baseline monitoring frequency horizon
