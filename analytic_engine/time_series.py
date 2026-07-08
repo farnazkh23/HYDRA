@@ -59,16 +59,27 @@ class InternalTelemetryEngine:
             return self._execute_mock_fallback(history_df)
 
     def _execute_mock_fallback(self, history_df: pd.DataFrame) -> Tuple[bool, Dict]:
+        """
+        Local heuristic fallback used when NIXTLA_API_KEY is missing or the
+        live TimeGPT call fails. Severity is computed directly from the
+        actual input series (spike ratio vs. the prior value), not a
+        hardcoded constant.
+        """
         has_spike = False
+        severity = 0.0
         if not history_df.empty and len(history_df) > 1:
-            has_spike = bool(history_df['value'].iloc[-1] > (history_df['value'].iloc[-2] * 10))
+            last_value = history_df['value'].iloc[-1]
+            prev_value = history_df['value'].iloc[-2]
+            has_spike = bool(last_value > (prev_value * 10))
+            if has_spike and prev_value:
+                severity = float(last_value / prev_value)
 
         last_value = history_df['value'].iloc[-1] if not history_df.empty else 50000
         return has_spike, {
             "forecasted_mean": last_value / 10 if has_spike else last_value,
             "anomaly_flag": has_spike,
-            "severity_score": 16662.8986 if has_spike else 0.0,  # Matches target live tracking verification scripts
-            "engine_status": "graceful_fallback_mock"
+            "severity_score": severity,
+            "engine_status": "local_heuristic_fallback"
         }
 
 
