@@ -85,7 +85,10 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
             )
         ]
 
-    # 2. Run Live Layer 2 Internal Telemetry Checking
+    # 2. Run Layer 2 Internal Telemetry Checking
+    #    Uses live Nixtla TimeGPT when NIXTLA_API_KEY is configured; otherwise
+    #    falls back to a local heuristic (labelled "local_heuristic_fallback"
+    #    in ts_metrics["engine_status"]).
     ts_engine = InternalTelemetryEngine()
     _, ts_metrics = ts_engine.detect_volumetric_anomaly(transaction_history)
 
@@ -102,11 +105,16 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
     data_assembler = ComplianceMultiModalDataset()
     matrix_X = data_assembler.impute_and_vectorize(ts_metrics, graph_metrics)
 
-    # 5. Compute Continuous Deep Survival Horizon Timeline
+    # 5. Compute Survival-Risk Proxy / Urgency Heuristic Horizon (T)
+    #    Untrained by default (heuristic proxy mode); a trained, calibrated
+    #    survival model is roadmap, not current behaviour. See
+    #    analytic_engine/models.py for details.
     survival_model = BaseSurvivalModel()
     predicted_t, uncertainty = survival_model.calculate_time_to_decay(matrix_X)
 
-    # 6. Route Through Budget-Aware Guardrailed Output Layer (Sovereign Swiss Apertus AI)
+    # 6. Route Through Budget-Aware Guardrailed Output Layer
+    #    Uses live Apertus AI via the PublicAI gateway when APERTUS_API_KEY
+    #    is configured; otherwise returns a clearly labelled local fallback.
     raw_context_signal = f"Rationale: {drift_event.get('rationale')}. Detected Terms: {drift_event.get('matched_risk_terms')}. Severity: {drift_event.get('severity')}"
     router = CostAwareCascadingRouter()
     final_audit_log = router.evaluate_routing_tier(client_id, predicted_t, raw_context_signal)
@@ -416,7 +424,9 @@ def main() -> None:
         print("\n✅ Layer 1 Scan Complete: No profile anomalies crossed threshold boundaries.")
         return
 
-    # Build transaction time-series history dataframe mapping to volume metrics
+    # SYNTHETIC/DEMO DATA: planted single-day volume spike used to exercise
+    # the Layer 2 pipeline end-to-end. This is NOT a real detected external
+    # transaction anomaly.
     dates = pd.date_range(start="2026-05-01", end="2026-06-20", freq="D")
     volumes = [150 if i < (len(dates) - 1) else 2500000 for i in range(len(dates))]
     history_df = pd.DataFrame({"timestamp": dates, "value": volumes})
