@@ -150,6 +150,18 @@ def _map_reasoning_trace(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
+    """
+    Map the Layer 2 router output to the frontend Loop B shape.
+
+    NOTE ON HONESTY: `horizon_days`/`confidence` below are a static,
+    rule-based lookup keyed by `risk_token` - not a fresh per-event
+    TimeGPT or calibrated survival-model computation. TimeGPT (Nixtla) and
+    the survival network still run for real upstream (in
+    execute_hydra_pipeline) as inputs to the router's decision, but their
+    raw outputs are not plumbed back through this mapping layer, so we
+    label these fields as an urgency heuristic rather than implying a
+    live forecast was recomputed here.
+    """
     risk_token = getattr(audit_log, "risk_token", "LOW_RISK")
     router_path = "heavy" if risk_token == "CRITICAL_BREACH" else "cheap"
     drift_score = drift_event.get("drift_score", 0.5)
@@ -164,7 +176,7 @@ def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
         "router": {
             "path": router_path,
             "risk_token": risk_token,
-            "reason": f"Survival horizon {horizon_days:.1f}d — {'below' if router_path == 'heavy' else 'above'} critical threshold",
+            "reason": f"Urgency heuristic horizon {horizon_days:.1f}d - {'below' if router_path == 'heavy' else 'above'} critical threshold",
             "model": "Apertus AI (PublicAI gateway)",
             "tokens": 320 if router_path == "heavy" else 0,
             "cost_usd": 0.00015 if router_path == "heavy" else 0.0002,
@@ -174,11 +186,13 @@ def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
             "anomaly_score": anomaly,
             "horizon_days": horizon_days,
             "uncertainty": [round(anomaly * 0.88, 3), min(round(anomaly * 1.12, 3), 1.0)],
+            "model": "HYDRA urgency heuristic (rule-based horizon lookup by risk tier)",
+            "note": "Not a live per-event TimeGPT forecast - see _map_loop_b docstring.",
         },
         "survival": {
-            "summary": f"Compliance survival horizon: {horizon_days:.1f} days before regulatory action threshold.",
+            "summary": f"Urgency heuristic estimate: {horizon_days:.1f} days before regulatory action threshold (rule-based horizon lookup, not a calibrated survival-model forecast).",
             "confidence": confidence,
-            "model": "Cox Proportional Hazards (HYDRA v2)",
+            "model": "HYDRA urgency heuristic (rule-based horizon lookup)",
             "time_to_decay_days": horizon_days,
         },
         "graphrag": None,   # populated after KG update in get_alerts()
@@ -190,13 +204,22 @@ def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
 def _run_layer2(drift_event: dict[str, Any]) -> dict[str, Any] | None:
     try:
         import pandas as pd
+        # SYNTHETIC/DEMO DATA: planted single-day volume spike used to
+        # exercise the Layer 2 pipeline end-to-end. This is NOT a real
+        # detected external transaction anomaly.
         dates = pd.date_range(start="2026-05-01", end="2026-06-21", freq="D")
         volumes = [150] * (len(dates) - 1) + [2_500_000]
         history_df = pd.DataFrame({"timestamp": dates, "value": volumes})
         audit_log = asyncio.run(_execute_hydra_pipeline(drift_event, history_df))
         if audit_log is None:
             return None
-        return _map_loop_b(audit_log, drift_event)
+        loop_b = _map_loop_b(audit_log, drift_event)
+        loop_b["transaction_series_source"] = "synthetic_demo_data"
+        loop_b["transaction_series_note"] = (
+            "Planted single-day volume spike for demo purposes - not a real "
+            "detected external transaction anomaly."
+        )
+        return loop_b
     except Exception as exc:
         print(f"[HYDRA API] Layer 2 error for {drift_event.get('event_id')}: {exc}", file=sys.stderr)
         return None
