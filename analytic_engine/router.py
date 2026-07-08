@@ -23,7 +23,7 @@ class CostAwareCascadingRouter:
         Sovereign Gateway Routing Module.
         Connected directly to the Swiss AI Initiative Apertus platform via PublicAI.
         """
-        self.api_key = "s" #os.getenv("APERTUS_API_KEY")
+        self.api_key = os.getenv("APERTUS_API_KEY")
         self.client = None
 
         if not self.api_key:
@@ -114,6 +114,6 @@ Context Parameters for Client {client_id}: {raw_payload}. Predicted decay profil
     def _execute_mock_fallback(self, predicted_t: float) -> ComplianceAuditLog:
         return ComplianceAuditLog(
             risk_token="CRITICAL_BREACH",
-            chain_of_thought=f"[APERTUS FALLBACK LOG] Survival horizon collapsed to {predicted_t:.2f} days. Active corporate transactions show material deviation from onboarding baseline (SaaS Model -> Crypto Trading Brokerage).",
-            audit_citations=["Swiss Corporate Registry (ZEFIX) Fallback Check", "Internal Transaction Ledger Match"]
+            chain_of_thought=f"[LOCAL FALLBACK - APERTUS_API_KEY missing or live Apertus call failed] Survival horizon collapsed to {predicted_t:.2f} days. This is a locally generated fallback assessment, not live Apertus AI output. Manual compliance review is recommended.",
+            audit_citations=["Local Fallback Heuristic - no live Apertus reasoning available"]
         )
