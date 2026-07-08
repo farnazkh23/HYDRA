@@ -289,7 +289,7 @@ class HydraEngineOutput(BaseModel):
             timegpt_risk_trend=self.forecast.next_7_days_risk_trend,
             timegpt_uncertainty=self.forecast.uncertainty,
             timegpt_summary=f"Risk trend: {self.forecast.next_7_days_risk_trend.value}, uncertainty: {self.forecast.uncertainty.value}",
-            survival_model_used="DeepSurv",
+            survival_model_used="urgency_heuristic",
             time_to_compliance_decay_days=self.time_to_compliance_decay_days,
             survival_confidence=0.0,
             survival_summary=f"Compliance decay expected in {self.time_to_compliance_decay_days} days",
@@ -380,8 +380,8 @@ class LoopBTrace(BaseModel):
     timegpt_summary: str
 
     # Survival model
-    survival_model_used: str                   # "SumoNet" | "DeepSurv" | "ConSurv"
-    time_to_compliance_decay_days: float       # T — matches engine field name exactly
+    survival_model_used: str                   # "urgency_heuristic" - survival-risk proxy, not a calibrated survival model (see analytic_engine/models.py)
+    time_to_compliance_decay_days: float       # T - matches engine field name exactly
     survival_confidence: float
     survival_summary: str
 
