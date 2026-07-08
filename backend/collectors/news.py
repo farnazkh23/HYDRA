@@ -1,3 +1,10 @@
+"""
+Event Registry news/events collector.
+
+Consumes the SwissHacks-provided News MCP environment backed by the Event
+Registry REST API. This module is a REST client against that environment -
+HYDRA does not implement its own MCP server or client.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -62,6 +69,12 @@ class EventRegistryNewsCollector:
         self.expand_adverse_queries = expand_adverse_queries
         self.last_query_count = 0
 
+        if not self.api_key and enabled is None:
+            print(
+                "[EventRegistry] EVENT_REGISTRY_API_KEY not set - collector "
+                "disabled, no live news signals will be fetched."
+            )
+
     def fetch_company_news(self, client_id: str, company_name: str, limit: int = 10, days_back: int = 7) -> list[RawSignal]:
         if not self.enabled:
             self.last_query_count = 0
@@ -72,6 +85,7 @@ class EventRegistryNewsCollector:
 
         signals: list[RawSignal] = []
         self.last_query_count = 0
+        public_url = f"{EVENT_REGISTRY_BASE}/article/getArticles"
         for query in _expanded_news_queries(company_name, self.expand_adverse_queries):
             params = urllib.parse.urlencode(
                 {
@@ -85,12 +99,12 @@ class EventRegistryNewsCollector:
                     "dateEnd": date_to,
                 }
             )
-            url = f"{EVENT_REGISTRY_BASE}/article/getArticles?{params}"
+            query_url = f"{public_url}?{params}"
             try:
-                with urllib.request.urlopen(url, timeout=8) as response:
+                with urllib.request.urlopen(query_url, timeout=8) as response:
                     payload = json.loads(response.read().decode("utf-8"))
             except Exception as exc:
-                print(f"[EventRegistry] Request failed for {company_name}: {exc}")
+                print(f"[EventRegistry] Request failed for {company_name}: {type(exc).__name__}")
                 continue
 
             self.last_query_count += 1
@@ -99,7 +113,10 @@ class EventRegistryNewsCollector:
                     payload=payload,
                     client_id=client_id,
                     company_name=company_name,
-                    fallback_url=url,
+                    # Key-less public endpoint used as the citation fallback URL
+                    # so EVENT_REGISTRY_API_KEY is never stored in signal
+                    # metadata, citations, or downstream audit logs.
+                    fallback_url=public_url,
                     adverse_only=query != company_name,
                     query=query,
                 )
@@ -111,6 +128,10 @@ async def fetch_news(client: KYCProfile, days_back: int = 7) -> list[RawSignal]:
     """Async Event Registry article search for backend schedulers/API routes."""
     api_key = os.getenv("EVENT_REGISTRY_API_KEY", "")
     if not api_key:
+        print(
+            f"[EventRegistry] EVENT_REGISTRY_API_KEY not set - returning "
+            f"mock_news fallback signals for {client.name}, not live data."
+        )
         return list(mock_company_news(client.client_id, client.name))
 
     date_from = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
@@ -151,6 +172,10 @@ async def fetch_events(client: KYCProfile, days_back: int = 7) -> list[RawSignal
     """Async Event Registry event-cluster search for backend schedulers/API routes."""
     api_key = os.getenv("EVENT_REGISTRY_API_KEY", "")
     if not api_key:
+        print(
+            f"[EventRegistry] EVENT_REGISTRY_API_KEY not set - skipping "
+            f"event-cluster fetch for {client.name} (no live or fallback data)."
+        )
         return []
 
     date_from = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
