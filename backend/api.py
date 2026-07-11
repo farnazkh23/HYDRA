@@ -727,6 +727,12 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         "signals_dropped": metrics.get("signals_dropped", 0),
         "drift_events": metrics.get("events_emitted", 0),
         "alerts": alerts,
+        "alerts_available": len(db.get_all_alerts()),
+        "note": (
+            "This endpoint performs live processing: it invalidates the cached "
+            "pipeline result for this client and re-runs signal collection, "
+            "drift detection, and alert enrichment before returning."
+        ),
     }
 
 
