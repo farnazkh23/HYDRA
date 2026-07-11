@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RiskBadge } from "@/components/ui/risk-badge";
-import { getCustomerById, getKYCDriftRecord, getReasoningTrace, getAlerts, getKGTriples } from "@/lib/services";
+import { getCustomerById, getKYCDriftRecord, getReasoningTrace, getAlerts } from "@/lib/services";
 import type { Customer, KYCDriftRecord, AIReasoningTrace, Alert, RiskStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/customers/$id")({
@@ -23,25 +23,13 @@ function CustomerDetail() {
   const [drift, setDrift] = useState<KYCDriftRecord | null>(null);
   const [trace, setTrace] = useState<AIReasoningTrace | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [kgTriples, setKgTriples] = useState<Array<{ subject: string; predicate: string; object: string; start_time: string }>>([]);
 
   useEffect(() => {
     getCustomerById(id).then((x) => setC(x ?? null));
     getKYCDriftRecord(id).then((x) => setDrift(x ?? null));
-    getKGTriples(id).then((t) => setKgTriples(t ?? []));
+    getReasoningTrace("a-1001").then((x) => setTrace(x ?? null));
+    getAlerts().then((a) => setAlerts(a.filter((x) => x.customerId === id)));
   }, [id]);
-
-  useEffect(() => {
-    if (!c) return;
-    getAlerts().then((a) => {
-      // customerId in alerts is clientId ("demo-spacex-001"), match via c.clientId
-      const customerAlerts = a.filter((x) => x.customerId === c.clientId || x.customerId === id);
-      setAlerts(customerAlerts);
-      if (customerAlerts[0]) {
-        getReasoningTrace(customerAlerts[0].id).then((x) => setTrace(x ?? null));
-      }
-    });
-  }, [c]);
 
   if (!c) return <AppLayout><div className="p-10 text-muted-foreground">Loading…</div></AppLayout>;
 
@@ -240,40 +228,6 @@ function CustomerDetail() {
 
             {/* Engine Analysis */}
             {trace && <EngineAnalysis trace={trace} />}
-
-            {/* Live KG Triples from Neo4j */}
-            {kgTriples.length > 0 && (
-              <section className="rounded-2xl border border-border bg-card glass p-5">
-                <h3 className="text-sm font-semibold mb-1">Knowledge Graph — Active Relationships</h3>
-                <p className="text-[11px] text-muted-foreground mb-4">Live entity triples from Neo4j updated by HYDRA drift events.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground text-left">
-                        <th className="pb-2 pr-4 font-medium">Subject</th>
-                        <th className="pb-2 pr-4 font-medium">Relationship</th>
-                        <th className="pb-2 pr-4 font-medium">Object</th>
-                        <th className="pb-2 font-medium">Since</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {kgTriples.map((t, i) => (
-                        <tr key={i} className="border-b border-border/50 hover:bg-surface-2/40">
-                          <td className="py-2 pr-4 text-foreground/80">{t.subject}</td>
-                          <td className="py-2 pr-4">
-                            <span className="rounded-md bg-neon-soft text-neon px-2 py-0.5 font-mono text-[10px]">
-                              {t.predicate.replace(/_/g, " ")}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-4 text-foreground/80">{t.object}</td>
-                          <td className="py-2 text-muted-foreground">{t.start_time ? new Date(t.start_time).toLocaleDateString() : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
 
             {/* KYC Drift Diff */}
             {drift && <KYCDriftCard record={drift} />}
@@ -488,17 +442,11 @@ function EngineAnalysis({ trace }: { trace: AIReasoningTrace }) {
           </Grid>
         )}
         {tab === "graphrag" && (
-          trace.loop_b?.graphrag ? (
-            <Grid>
-              <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
-              <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
-              <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
-            </Grid>
-          ) : (
-            <div className="text-muted-foreground text-xs py-4 text-center">
-              No KG triples extracted for this event — no structured entity signals detected in drift source.
-            </div>
-          )
+          <Grid>
+            <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
+            <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
+            <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
+          </Grid>
         )}
         {tab === "timegpt" && (
           <Grid>

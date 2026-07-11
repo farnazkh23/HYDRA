@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { Download, FileText, User, CheckCircle2, Sparkles, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Download, FileText, User, CheckCircle2, Sparkles } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { getCustomerById, getKYCDriftRecord, getCustomerHistory, getLogs, getCustomers } from "@/lib/services";
 import {
   Select,
   SelectContent,
@@ -82,23 +81,16 @@ type CustomerOption = {
   lastUpdated: string;
 };
 
-function useCustomerOptions(): CustomerOption[] {
-  const [options, setOptions] = useState<CustomerOption[]>([]);
-  useEffect(() => {
-    getCustomers().then((customers) =>
-      setOptions(
-        customers.map((c) => ({
-          id: c.id,
-          name: c.companyName,
-          risk: c.riskStatus as RiskStatus,
-          drift: c.driftSeverity as DriftSeverity,
-          lastUpdated: c.lastUpdated,
-        })),
-      ),
-    );
-  }, []);
-  return options;
-}
+const customerOptions: CustomerOption[] = [
+  { id: "spacex", name: "SpaceX", risk: "high", drift: "critical", lastUpdated: "2h ago" },
+  { id: "tesla", name: "Tesla", risk: "elevated", drift: "high", lastUpdated: "5h ago" },
+  { id: "amazon", name: "Amazon", risk: "medium", drift: "medium", lastUpdated: "1d ago" },
+  { id: "nvidia", name: "NVIDIA", risk: "medium", drift: "low", lastUpdated: "3h ago" },
+  { id: "binance", name: "Binance Holdings", risk: "high", drift: "critical", lastUpdated: "1h ago" },
+  { id: "openai", name: "OpenAI", risk: "elevated", drift: "high", lastUpdated: "6h ago" },
+  { id: "apple", name: "Apple", risk: "low", drift: "low", lastUpdated: "2d ago" },
+  { id: "meta", name: "Meta", risk: "medium", drift: "medium", lastUpdated: "8h ago" },
+];
 
 const driftLabel: Record<DriftSeverity, string> = {
   low: "Low drift",
@@ -171,41 +163,31 @@ function SectionHeader({ kicker, title, desc }: { kicker: string; title: string;
 }
 
 function CustomerReportCard() {
-  const customerOptions = useCustomerOptions();
   const [customerId, setCustomerId] = useState<string>("");
   const [prepared, setPrepared] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [reportPayload, setReportPayload] = useState<unknown>(null);
   const selected = customerOptions.find((c) => c.id === customerId);
 
-  const generate = async () => {
+  const generate = () => {
     if (!selected) return;
-    setGenerating(true);
-    try {
-      const [customer, kycDrift, history] = await Promise.allSettled([
-        getCustomerById(selected.id),
-        getKYCDriftRecord(selected.id),
-        getCustomerHistory(selected.id),
-      ]);
-      setReportPayload({
-        report_id: `customer_${selected.id}`,
-        schema_version: "hydra.report.v1",
-        title: `Customer-specific compliance report — ${selected.name}`,
-        report_type: "customer",
-        generated_at: new Date().toISOString(),
-        customer: customer.status === "fulfilled" ? customer.value : { id: selected.id, name: selected.name, risk_status: selected.risk },
-        kyc_drift: kycDrift.status === "fulfilled" ? kycDrift.value : null,
-        drift_history: history.status === "fulfilled" ? history.value : null,
-      });
-      setPrepared(selected.id);
-    } finally {
-      setGenerating(false);
-    }
+    setPrepared(selected.id);
   };
 
   const download = () => {
-    if (!selected || !reportPayload) return;
-    triggerDownload(`hydra_customer_${slug(selected.name)}_report.json`, reportPayload);
+    if (!selected) return;
+    triggerDownload(`hydra_customer_${slug(selected.name)}_report.json`, {
+      report_id: `customer_${selected.id}`,
+      title: `Customer-specific report — ${selected.name}`,
+      report_type: "customer",
+      customer: {
+        id: selected.id,
+        name: selected.name,
+        risk_status: selected.risk,
+        drift_severity: selected.drift,
+        last_updated: selected.lastUpdated,
+      },
+      generated_at: new Date().toISOString(),
+      note: "Mock HYDRA customer-specific report — replace with live API output.",
+    });
   };
 
   const isPrepared = prepared && selected && prepared === selected.id;
@@ -254,11 +236,10 @@ function CustomerReportCard() {
 
         <button
           onClick={generate}
-          disabled={!selected || !!isPrepared || generating}
+          disabled={!selected || !!isPrepared}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-neon text-[#0b0f0a] px-4 py-2 text-xs font-semibold hover:bg-neon/90 disabled:opacity-40 disabled:cursor-not-allowed h-9"
         >
-          {generating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-          {generating ? "Generating…" : "Generate report"}
+          <Sparkles size={12} /> Generate report
         </button>
       </div>
 

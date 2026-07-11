@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ShieldAlert, Users, TrendingUp, Radio } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, ShieldAlert, Users, TrendingUp } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { NetworkGraph } from "@/components/NetworkGraph";
 import { RiskBadge } from "@/components/ui/risk-badge";
@@ -17,37 +17,12 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-function useLiveFeed() {
-  const [connected, setConnected] = useState(false);
-  const [alertCount, setAlertCount] = useState(0);
-  const [lastEvent, setLastEvent] = useState<string | null>(null);
-  const esRef = useRef<EventSource | null>(null);
-
-  useEffect(() => {
-    const es = new EventSource("/api/events/stream");
-    esRef.current = es;
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "heartbeat") setAlertCount(msg.alert_count ?? 0);
-        if (msg.type === "new_alert") setLastEvent(msg.alert?.title ?? "New alert");
-      } catch {}
-    };
-    return () => { es.close(); setConnected(false); };
-  }, []);
-
-  return { connected, alertCount, lastEvent };
-}
-
 function Dashboard() {
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [selected, setSelected] = useState<GraphNode | null>(null);
-  const live = useLiveFeed();
 
   useEffect(() => {
     getGraph().then((g) => {
@@ -69,21 +44,15 @@ function Dashboard() {
 
   const connected = useMemo(() => {
     if (!selected) return [];
-    const ids = edges
+    return edges
       .filter((e) => e.source === selected.id || e.target === selected.id)
       .map((e) => (e.source === selected.id ? e.target : e.source));
-    return [...new Set(ids)]; // deduplicate
   }, [selected, edges]);
 
-  const lastAlert = useMemo(() => {
-    if (!selected) return null;
-    return alerts.find(
-      (a) =>
-        a.customerId === selected.id ||
-        a.customerId.replace("demo-", "").replace(/-001$/, "") === selected.id ||
-        a.customerId.includes(selected.id),
-    );
-  }, [selected, alerts]);
+  const lastAlert = useMemo(
+    () => (selected ? alerts.find((a) => a.customerId === selected.id) : null),
+    [selected, alerts],
+  );
 
   return (
     <AppLayout>
@@ -99,23 +68,11 @@ function Dashboard() {
               this is what HYDRA is watching right now.
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2">
             <Kpi icon={Users} label="Customers" value={String(stats.total)} />
             <Kpi icon={ShieldAlert} label="High Risk" value={String(stats.high)} tone="high" />
             <Kpi icon={Activity} label="Elevated" value={String(stats.elev)} tone="elevated" />
             <Kpi icon={TrendingUp} label="Avg Drift" value={`${stats.driftAvg}%`} />
-            <div className="rounded-xl border border-border bg-card glass px-4 py-3 min-w-[120px] lime-outline flex flex-col justify-between">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <Radio size={12} /> Live
-              </div>
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${live.connected ? "bg-neon animate-pulse" : "bg-muted-foreground"}`} />
-                <span className="text-sm font-semibold text-neon">{live.connected ? "Connected" : "Connecting…"}</span>
-              </div>
-              {live.alertCount > 0 && (
-                <div className="text-[10px] text-muted-foreground mt-0.5">{live.alertCount} alert{live.alertCount !== 1 ? "s" : ""} in DB</div>
-              )}
-            </div>
           </div>
         </header>
 
@@ -127,78 +84,56 @@ function Dashboard() {
               Selected node
             </div>
             {selected ? (
-              selected.type === "company" ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-display text-xl font-semibold">{selected.label}</h3>
-                    <RiskBadge level={selected.riskStatus} />
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-display text-xl font-semibold">{selected.label}</h3>
+                  <RiskBadge level={selected.riskStatus} />
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground capitalize">{selected.type}</div>
+
+                <dl className="mt-5 space-y-3 text-sm">
+                  <Row k="Drift score" v={`${selected.driftScore}%`} />
+                  <Row k="Last update" v={selected.lastUpdated} />
+                  <Row k="Connected entities" v={String(connected.length)} />
+                </dl>
+
+                <div className="mt-5">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+                    Connections
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">Company</div>
-                  <dl className="mt-5 space-y-3 text-sm">
-                    <Row k="Drift score" v={`${selected.driftScore}%`} />
-                    <Row k="Last update" v={selected.lastUpdated} />
-                    <Row k="Connected entities" v={String(connected.length)} />
-                  </dl>
-                  <div className="mt-5">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Connections</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {connected.map((c, i) => (
-                        <span key={`${c}-${i}`} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
-                          {nodes.find((n) => n.id === c)?.label ?? c}
-                        </span>
-                      ))}
-                      {connected.length === 0 && <span className="text-xs text-muted-foreground">No links yet</span>}
+                  <div className="flex flex-wrap gap-1.5">
+                    {connected.map((c) => (
+                      <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
+                        {nodes.find((n) => n.id === c)?.label ?? c}
+                      </span>
+                    ))}
+                    {connected.length === 0 && (
+                      <span className="text-xs text-muted-foreground">No links yet</span>
+                    )}
+                  </div>
+                </div>
+
+                <Link to="/alerts" data-tour="latest-alert">
+                  <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+                      Latest alert
                     </div>
-                  </div>
-                  {lastAlert ? (
-                    <Link to="/alerts/$id" params={{ id: lastAlert.id }}>
-                      <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3 cursor-pointer hover:border-neon/50 hover:bg-surface-2/80 transition-colors">
-                        <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
+                    {lastAlert ? (
+                      <>
                         <div className="text-sm font-medium">{lastAlert.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{lastAlert.driftType} · {lastAlert.timestamp}</div>
-                      </div>
-                    </Link>
-                  ) : (
-                    <div className="mt-5 rounded-lg border border-border bg-surface-2/60 p-3">
-                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Latest alert</div>
-                      <div className="text-xs text-muted-foreground">No alerts in window.</div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-display text-lg font-semibold">{selected.label}</h3>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {lastAlert.driftType} · {lastAlert.timestamp}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No recent alerts.</div>
+                    )}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground capitalize">KG entity · {selected.type}</div>
-                  <div className="mt-5">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Linked to</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {connected.map((c) => {
-                        const n = nodes.find((n) => n.id === c);
-                        return n?.type === "company" ? (
-                          <Link key={c} to="/customers/$id" params={{ id: c }}>
-                            <span className="rounded-md border border-neon/40 bg-neon-soft px-2 py-0.5 text-[11px] text-neon cursor-pointer hover:bg-neon/20">
-                              {n.label}
-                            </span>
-                          </Link>
-                        ) : (
-                          <span key={c} className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px]">
-                            {n?.label ?? c}
-                          </span>
-                        );
-                      })}
-                      {connected.length === 0 && <span className="text-xs text-muted-foreground">No links yet</span>}
-                    </div>
-                  </div>
-                  <div className="mt-4 text-xs text-muted-foreground">
-                    This entity was detected via GraphRAG from real news signals.
-                  </div>
-                </>
-              )
+                </Link>
+              </>
             ) : (
               <div className="text-sm text-muted-foreground">
-                Click any node to inspect.
+                Drag any node to inspect. Click to select.
               </div>
             )}
           </aside>

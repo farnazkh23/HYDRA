@@ -31,6 +31,7 @@ function DocumentationPage() {
   const [visitedIds, setVisitedIds] = useState<string[]>([]);
   const [currentActiveId, setCurrentActiveId] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [finished, setFinished] = useState(false);
   const timer = useRef<number | null>(null);
 
   const selected = selectedId ? allNodes.find((n) => n.id === selectedId) ?? null : null;
@@ -42,6 +43,7 @@ function DocumentationPage() {
   const play = () => {
     if (playing) return;
     setPlaying(true);
+    setFinished(false);
     setSelectedId(null);
     let i = 0;
     const first = playSequence[0];
@@ -53,6 +55,7 @@ function DocumentationPage() {
         if (timer.current) window.clearInterval(timer.current);
         timer.current = null;
         setPlaying(false);
+        setFinished(true);
         window.setTimeout(() => setCurrentActiveId(null), 800);
         return;
       }
@@ -67,11 +70,13 @@ function DocumentationPage() {
       timer.current = null;
     }
     setPlaying(false);
+    setFinished(false);
     setVisitedIds([]);
     setCurrentActiveId(null);
     setSelectedId(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
 
   return (
     <AppLayout>
@@ -97,6 +102,7 @@ function DocumentationPage() {
                 type="button"
                 onClick={play}
                 disabled={playing}
+                data-tour="doc-play"
                 className="inline-flex items-center gap-2 rounded-lg border border-neon/40 bg-neon-soft px-3 py-1.5 text-[12px] text-neon hover-lift disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Play size={14} /> {playing ? "Playing…" : "Play pipeline"}
@@ -131,7 +137,11 @@ function DocumentationPage() {
             {advantageCards.map((c) => (
               <div
                 key={c.title}
-                className="rounded-xl border border-neon/30 bg-card/60 backdrop-blur p-4 hover-lift transition-all"
+                className={`rounded-xl border bg-card/60 backdrop-blur p-4 hover-lift transition-all ${
+                  finished
+                    ? "border-neon shadow-[0_0_20px_oklch(0.92_0.22_128/0.35)]"
+                    : "border-neon/30"
+                }`}
               >
                 <div className="font-display text-[10px] uppercase tracking-[0.22em] text-neon">
                   Advantage

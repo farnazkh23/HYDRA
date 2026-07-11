@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RiskBadge } from "@/components/ui/risk-badge";
-import { getAlerts } from "@/lib/services";
-import type { Alert, RiskStatus } from "@/lib/types";
+import { alerts as allAlerts } from "@/lib/mock-data";
+import type { RiskStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/alerts/")({
   head: () => ({ meta: [{ title: "Alerts — HYDRA" }] }),
@@ -15,14 +14,7 @@ const sevOrder: Record<string, number> = { high: 0, elevated: 1, medium: 2, low:
 
 function AlertsPage() {
   const navigate = useNavigate();
-  const [rawAlerts, setRawAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getAlerts().then((a) => setRawAlerts(a)).finally(() => setLoading(false));
-  }, []);
-
-  const alerts = [...rawAlerts].sort(
+  const alerts = [...allAlerts].sort(
     (x, y) => (sevOrder[x.severity] ?? 9) - (sevOrder[y.severity] ?? 9),
   );
 
@@ -39,16 +31,11 @@ function AlertsPage() {
           </p>
         </header>
 
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 size={14} className="animate-spin" /> Loading alerts…
-          </div>
-        )}
-
         <div className="space-y-2">
           {alerts.map((a) => (
             <div
               key={a.id}
+              data-alert-row={a.id}
               role="button"
               tabIndex={0}
               onClick={() => navigate({ to: "/alerts/$id", params: { id: a.id } })}

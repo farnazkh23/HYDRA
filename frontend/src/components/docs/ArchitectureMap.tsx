@@ -202,12 +202,20 @@ export function ArchitectureMap({
             T Decision Gate
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-            <div className="rounded-lg border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
+            <div className={`rounded-lg border px-3 py-2 text-[11px] transition-all ${
+              isVisited("t-decision") || isActive("t-decision")
+                ? "border-border bg-surface/60 text-muted-foreground"
+                : "border-border bg-surface/60 text-muted-foreground"
+            }`}>
               <div className="font-mono text-foreground/80">T ≥ 7 days</div>
               <div>→ Low-cost tracking pass</div>
             </div>
-            <div className="rounded-lg border-2 border-[color:var(--risk-high)] bg-[color:var(--risk-high)]/15 px-3 py-2 text-[11px] text-[color:var(--risk-high)] shadow-[0_0_24px_oklch(0.65_0.24_25/0.35)]">
-              <div className="font-mono font-semibold">T &lt; 7 days</div>
+            <div className={`rounded-lg border px-3 py-2 text-[11px] transition-all ${
+              isVisited("t-decision") || isActive("t-decision")
+                ? "border-2 border-[color:var(--risk-high)] bg-[color:var(--risk-high)]/15 text-[color:var(--risk-high)] shadow-[0_0_24px_oklch(0.65_0.24_25/0.35)]"
+                : "border-border bg-surface/60 text-muted-foreground"
+            }`}>
+              <div className={`font-mono ${isVisited("t-decision") || isActive("t-decision") ? "font-semibold" : "text-foreground/80"}`}>T &lt; 7 days</div>
               <div>→ Critical Drift Breach</div>
               <div>→ Sovereign Swiss Reasoning</div>
               <div>→ Apertus / CSCS Alps</div>

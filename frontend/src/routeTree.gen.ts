@@ -11,15 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as LogoRouteImport } from './routes/logo'
+import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as DocumentationRouteImport } from './routes/documentation'
 import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as ClosingRouteImport } from './routes/closing'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers.index'
 import { Route as AlertsIndexRouteImport } from './routes/alerts.index'
 import { Route as CustomersIdRouteImport } from './routes/customers.$id'
+import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as AlertsIdRouteImport } from './routes/alerts.$id'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -32,14 +35,19 @@ const ReportsRoute = ReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortfolioRoute = PortfolioRouteImport.update({
-  id: '/portfolio',
-  path: '/portfolio',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogoRoute = LogoRouteImport.update({
+  id: '/logo',
+  path: '/logo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeaturesRoute = FeaturesRouteImport.update({
+  id: '/features',
+  path: '/features',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentationRoute = DocumentationRouteImport.update({
@@ -50,6 +58,11 @@ const DocumentationRoute = DocumentationRouteImport.update({
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClosingRoute = ClosingRouteImport.update({
+  id: '/closing',
+  path: '/closing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -77,6 +90,11 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => CustomersRoute,
 } as any)
+const ApiTtsRoute = ApiTtsRouteImport.update({
+  id: '/api/tts',
+  path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AlertsIdRoute = AlertsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -86,25 +104,31 @@ const AlertsIdRoute = AlertsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/closing': typeof ClosingRoute
   '/customers': typeof CustomersRouteWithChildren
   '/documentation': typeof DocumentationRoute
+  '/features': typeof FeaturesRoute
+  '/logo': typeof LogoRoute
   '/logs': typeof LogsRoute
-  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
+  '/api/tts': typeof ApiTtsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/alerts/': typeof AlertsIndexRoute
   '/customers/': typeof CustomersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/closing': typeof ClosingRoute
   '/documentation': typeof DocumentationRoute
+  '/features': typeof FeaturesRoute
+  '/logo': typeof LogoRoute
   '/logs': typeof LogsRoute
-  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
+  '/api/tts': typeof ApiTtsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/alerts': typeof AlertsIndexRoute
   '/customers': typeof CustomersIndexRoute
@@ -113,13 +137,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/closing': typeof ClosingRoute
   '/customers': typeof CustomersRouteWithChildren
   '/documentation': typeof DocumentationRoute
+  '/features': typeof FeaturesRoute
+  '/logo': typeof LogoRoute
   '/logs': typeof LogsRoute
-  '/portfolio': typeof PortfolioRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/alerts/$id': typeof AlertsIdRoute
+  '/api/tts': typeof ApiTtsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/alerts/': typeof AlertsIndexRoute
   '/customers/': typeof CustomersIndexRoute
@@ -129,25 +156,31 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alerts'
+    | '/closing'
     | '/customers'
     | '/documentation'
+    | '/features'
+    | '/logo'
     | '/logs'
-    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
+    | '/api/tts'
     | '/customers/$id'
     | '/alerts/'
     | '/customers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/closing'
     | '/documentation'
+    | '/features'
+    | '/logo'
     | '/logs'
-    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
+    | '/api/tts'
     | '/customers/$id'
     | '/alerts'
     | '/customers'
@@ -155,13 +188,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alerts'
+    | '/closing'
     | '/customers'
     | '/documentation'
+    | '/features'
+    | '/logo'
     | '/logs'
-    | '/portfolio'
     | '/reports'
     | '/settings'
     | '/alerts/$id'
+    | '/api/tts'
     | '/customers/$id'
     | '/alerts/'
     | '/customers/'
@@ -170,12 +206,15 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRouteWithChildren
+  ClosingRoute: typeof ClosingRoute
   CustomersRoute: typeof CustomersRouteWithChildren
   DocumentationRoute: typeof DocumentationRoute
+  FeaturesRoute: typeof FeaturesRoute
+  LogoRoute: typeof LogoRoute
   LogsRoute: typeof LogsRoute
-  PortfolioRoute: typeof PortfolioRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  ApiTtsRoute: typeof ApiTtsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -194,18 +233,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portfolio': {
-      id: '/portfolio'
-      path: '/portfolio'
-      fullPath: '/portfolio'
-      preLoaderRoute: typeof PortfolioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/logs': {
       id: '/logs'
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logo': {
+      id: '/logo'
+      path: '/logo'
+      fullPath: '/logo'
+      preLoaderRoute: typeof LogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/features': {
+      id: '/features'
+      path: '/features'
+      fullPath: '/features'
+      preLoaderRoute: typeof FeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documentation': {
@@ -220,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers'
       preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/closing': {
+      id: '/closing'
+      path: '/closing'
+      fullPath: '/closing'
+      preLoaderRoute: typeof ClosingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -256,6 +309,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/customers/$id'
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof CustomersRoute
+    }
+    '/api/tts': {
+      id: '/api/tts'
+      path: '/api/tts'
+      fullPath: '/api/tts'
+      preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/alerts/$id': {
       id: '/alerts/$id'
@@ -297,12 +357,15 @@ const CustomersRouteWithChildren = CustomersRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRouteWithChildren,
+  ClosingRoute: ClosingRoute,
   CustomersRoute: CustomersRouteWithChildren,
   DocumentationRoute: DocumentationRoute,
+  FeaturesRoute: FeaturesRoute,
+  LogoRoute: LogoRoute,
   LogsRoute: LogsRoute,
-  PortfolioRoute: PortfolioRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  ApiTtsRoute: ApiTtsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
