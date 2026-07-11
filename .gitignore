@@ -33,3 +33,7 @@ frontend/.env.production.local
 data/layer1_replay*/
 data/layer1_vae_snapshots*/
 data/layer1_audit_logs*/
+
+# Python virtual environment
+.venv/
+venv/
