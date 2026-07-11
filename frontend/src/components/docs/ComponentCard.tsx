@@ -22,7 +22,7 @@ export function ComponentCard({
       className={`group text-left w-full rounded-lg border bg-surface-2/80 px-3 py-2.5 transition-all hover-lift ${
         selected
           ? "lime-outline"
-          : critical
+          : critical && (visited || active)
           ? "border-[color:var(--risk-high)]/50"
           : visited
           ? "border-neon/40"

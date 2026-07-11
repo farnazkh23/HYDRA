@@ -1,42 +1,30 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, PieChart, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, Bell, FileText, Terminal, Settings, ChevronRight, BookOpen, Sparkles, Flag, Shield } from "lucide-react";
 import { HydraLogo } from "@/components/HydraLogo";
-import { getAlerts } from "@/lib/services";
 
 type NavItem = {
-  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/portfolio" | "/documentation";
+  to: "/" | "/customers" | "/alerts" | "/reports" | "/logs" | "/settings" | "/documentation" | "/logo" | "/features" | "/closing";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
   badge?: number;
 };
-const navBase: NavItem[] = [
+const nav: NavItem[] = [
+  { to: "/logo", label: "Logo", icon: Shield },
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/portfolio", label: "Portfolio", icon: PieChart },
+  { to: "/alerts", label: "Alerts", icon: Bell, badge: 2 },
   { to: "/customers", label: "Customers", icon: Users },
-  { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/logs", label: "Logs", icon: Terminal },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/documentation", label: "Documentation", icon: BookOpen },
+  { to: "/features", label: "Features", icon: Sparkles },
+  { to: "/closing", label: "Closing", icon: Flag },
 ];
 
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [alertCount, setAlertCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    getAlerts().then((a) => {
-      const open = a.filter((x) => x.status === "open").length;
-      setAlertCount(open > 0 ? open : null);
-    }).catch(() => {});
-  }, []);
-
-  const nav = navBase.map((item) =>
-    item.to === "/alerts" && alertCount ? { ...item, badge: alertCount } : item,
-  );
 
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur">

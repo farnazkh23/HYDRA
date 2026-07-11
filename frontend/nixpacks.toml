@@ -1,5 +1,0 @@
-[phases.install]
-cmds = ["npm install"]
-
-[phases.build]
-cmds = ["npm run build", "echo '=== server entries ===' && find . -maxdepth 6 \\( -name 'server.js' -o -name 'index.mjs' \\) | grep -v node_modules || true"]

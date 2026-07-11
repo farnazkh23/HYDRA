@@ -34,18 +34,12 @@ export function NetworkGraph({
   const drag = useRef<{ id: string; offX: number; offY: number } | null>(null);
 
   const simNodes = useRef<SimNode[]>([]);
-  // Sync simNodes when the nodes prop changes (e.g. after async fetch resolves).
-  // Preserve positions of nodes that already exist so the layout doesn't reset.
-  useEffect(() => {
-    if (nodes.length === 0) return;
-    const existing = new Map(simNodes.current.map((n) => [n.id, n]));
+  if (simNodes.current.length === 0) {
     simNodes.current = nodes.map((n, i) => {
-      const prev = existing.get(n.id);
-      if (prev) return { ...prev, ...n };
       const a = (i / nodes.length) * Math.PI * 2;
       return { ...n, x: 400 + Math.cos(a) * 200, y: 280 + Math.sin(a) * 180, vx: 0, vy: 0 };
     });
-  }, [nodes]);
+  }
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -198,6 +192,7 @@ export function NetworkGraph({
           return (
             <g
               key={n.id}
+              data-node-id={n.id}
               onPointerDown={(e) => handleDown(e, n)}
               style={{ cursor: "grab" }}
             >

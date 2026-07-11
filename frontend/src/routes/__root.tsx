@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider, themeInitScript } from "../components/theme-provider";
 import { Toaster } from "../components/ui/sonner";
+import { WalkthroughProvider } from "../components/walkthrough/WalkthroughProvider";
 
 function NotFoundComponent() {
   return (
@@ -85,6 +86,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Dark, bank-grade AML/KYC drift intelligence cockpit." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "HYDRA — Compliance Cockpit" },
+      { name: "twitter:description", content: "Dark, bank-grade AML/KYC drift intelligence cockpit." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/106daac2-8f18-4c11-b52c-630f6c7153b4/id-preview-65602b11--fd2aed4e-c7e0-4c16-ac7a-1f01af43406b.lovable.app-1782035079488.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/106daac2-8f18-4c11-b52c-630f6c7153b4/id-preview-65602b11--fd2aed4e-c7e0-4c16-ac7a-1f01af43406b.lovable.app-1782035079488.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -123,8 +128,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <WalkthroughProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </WalkthroughProvider>
         <Toaster position="top-right" richColors closeButton />
       </ThemeProvider>
     </QueryClientProvider>
