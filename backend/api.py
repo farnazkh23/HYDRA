@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
-import os
 import sys
 import uuid
 import time
@@ -75,12 +74,18 @@ CUSTOMER_TO_CLIENT_ID = {
 }
 
 
-def _get_pipeline(client_id: str = "demo-spacex-001") -> dict[str, Any]:
-    if client_id not in _pipeline_cache:
-        live = bool(os.environ.get("EVENT_REGISTRY_API_KEY"))
-        result = run_layer1_pipeline(client_id=client_id, limit=10, live=live)
-        _pipeline_cache[client_id] = result
-    return _pipeline_cache[client_id]
+def _get_cached_pipeline(client_id: str = "demo-spacex-001") -> dict[str, Any]:
+    """Return an existing pipeline result without triggering pipeline work."""
+    if client_id in _pipeline_cache:
+        return _pipeline_cache[client_id]
+    return {
+        "drift_events": [],
+        "layer1_metrics": {
+            "client_id": client_id,
+            "cache_status": "missing",
+            "note": "No cached pipeline result. Run POST /api/pipeline/run to populate it.",
+        },
+    }
 
 
 def _invalidate_cache(client_id: str | None = None) -> None:
@@ -411,7 +416,7 @@ def get_customers() -> list[dict[str, Any]]:
         client_id = CUSTOMER_TO_CLIENT_ID.get(c["id"])
         if not client_id:
             continue
-        result = _get_pipeline(client_id)
+        result = _get_cached_pipeline(client_id)
         events = result.get("drift_events", [])
         if events:
             max_score = max((e.get("drift_score", 0) for e in events), default=0)
@@ -433,10 +438,18 @@ def get_customer(customer_id: str) -> dict[str, Any]:
 def get_kyc_drift(customer_id: str) -> dict[str, Any]:
     client_id = CUSTOMER_TO_CLIENT_ID.get(customer_id)
     if client_id:
-        result = _get_pipeline(client_id)
+        result = _get_cached_pipeline(client_id)
         drift = _derive_kyc_drift(client_id, result.get("drift_events", []))
         if drift:
             return drift
+        if client_id not in _pipeline_cache:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "cache_status": "missing",
+                    "note": "No cached pipeline result. Run POST /api/pipeline/run to populate it.",
+                },
+            )
     raise HTTPException(status_code=404, detail="No KYC drift record found")
 
 
@@ -446,39 +459,6 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 
 @app.get("/api/alerts")
 def get_alerts() -> list[dict[str, Any]]:
-    from backend.neo4j_client import update_kg_from_drift_event
-    for client_id in PORTFOLIO_CLIENT_IDS:
-        result = _get_pipeline(client_id)
-        for event in result.get("drift_events", []):
-            alert = _map_alert(event)
-            db.upsert_alert(alert)
-            stored = db.get_alert(alert["id"])
-            if not stored:
-                continue
-            trace = stored.setdefault("reasoningTrace", {})
-
-            # Run Layer 2 if not done yet
-            if trace.get("loop_b") is None:
-                loop_b = _run_layer2(event)
-                if loop_b:
-                    trace["loop_b"] = loop_b
-                    db.upsert_alert(stored)
-
-            # Run KG update if not done yet (separate from loop_b so it always fires)
-            if trace.get("kg_update") is None:
-                kg_result = update_kg_from_drift_event(event)
-                if kg_result.get("status") == "applied":
-                    trace["kg_update"] = kg_result
-                    lb = trace.get("loop_b")
-                    if lb is not None:
-                        triples_added = kg_result.get("triples_added", [])
-                        lb["graphrag"] = {
-                            "new_entity": triples_added[0]["node_to"] if triples_added else "None detected",
-                            "triple_status": f"+{kg_result['added']} added  −{kg_result['deleted']} deprecated  ={kg_result['unchanged']} unchanged",
-                            "timestamp_slice": event.get("triggered_at", "—"),
-                        }
-                    db.upsert_alert(stored)
-
     return db.get_all_alerts()
 
 
@@ -487,13 +467,6 @@ def get_alert(alert_id: str) -> dict[str, Any]:
     alert = db.get_alert(alert_id)
     if alert:
         return alert
-    # Try to find it in the live pipeline output
-    result = _get_pipeline("demo-spacex-001")
-    for event in result.get("drift_events", []):
-        if event.get("event_id") == alert_id:
-            mapped = _map_alert(event)
-            db.upsert_alert(mapped)
-            return mapped
     raise HTTPException(status_code=404, detail="Alert not found")
 
 
@@ -510,10 +483,6 @@ def get_governance(alert_id: str) -> dict[str, Any]:
     alert = db.get_alert(alert_id)
     if alert and "governance" in alert:
         return alert["governance"]
-    result = _get_pipeline("demo-spacex-001")
-    for event in result.get("drift_events", []):
-        if event.get("event_id") == alert_id:
-            return _build_governance(event)
     raise HTTPException(status_code=404, detail="No governance record found")
 
 
@@ -532,10 +501,10 @@ def post_action(alert_id: str, body: dict[str, Any] = Body(...)) -> dict[str, An
 # Graph / Logs / Audit / Cost
 # ---------------------------------------------------------------------------
 
-def _live_drift_scores() -> dict[str, tuple[int, str]]:
+def _cached_drift_scores() -> dict[str, tuple[int, str]]:
     scores: dict[str, tuple[int, str]] = {}
     for client_id in PORTFOLIO_CLIENT_IDS:
-        events = _get_pipeline(client_id).get("drift_events", [])
+        events = _get_cached_pipeline(client_id).get("drift_events", [])
         if events:
             s = min(int(max(e.get("drift_score", 0) for e in events) * 100), 100)
             node_id = next((k for k, v in CUSTOMER_TO_CLIENT_ID.items() if v == client_id), None)
@@ -647,7 +616,7 @@ def _normalise_graph(graph: dict[str, Any], scores: dict[str, tuple[int, str]]) 
 
 @app.get("/api/graph")
 def get_graph() -> dict[str, Any]:
-    scores = _live_drift_scores()
+    scores = _cached_drift_scores()
 
     # 1 — Neo4j live graph
     try:
@@ -672,8 +641,17 @@ def get_graph() -> dict[str, Any]:
 def get_logs() -> list[dict[str, Any]]:
     logs = []
     for client_id in PORTFOLIO_CLIENT_IDS:
-        result = _get_pipeline(client_id)
-        logs.extend(_build_engine_logs(result))
+        result = _get_cached_pipeline(client_id)
+        if client_id in _pipeline_cache:
+            logs.extend(_build_engine_logs(result))
+        else:
+            logs.append({
+                "ts": "—",
+                "level": "info",
+                "module": "Cache",
+                "msg": f"No cached pipeline result for {client_id}; run POST /api/pipeline/run to populate it.",
+                "cache_status": "missing",
+            })
     return logs
 
 
@@ -685,8 +663,10 @@ def get_audit_log() -> list[dict[str, Any]]:
 @app.get("/api/cost-summary")
 def get_cost_summary() -> dict[str, Any]:
     totals: dict[str, float] = {"signals_processed": 0, "signals_dropped": 0, "events_emitted": 0, "llm_tokens": 0, "estimated_cost_units": 0.0, "news_queries": 0}
+    cached_clients = 0
     for client_id in PORTFOLIO_CLIENT_IDS:
-        m = _get_pipeline(client_id).get("layer1_metrics", {})
+        m = _get_cached_pipeline(client_id).get("layer1_metrics", {})
+        cached_clients += int(client_id in _pipeline_cache)
         for k in totals:
             totals[k] += m.get(k, 0)
     total_sig = totals["signals_processed"] or 1
@@ -698,6 +678,8 @@ def get_cost_summary() -> dict[str, Any]:
         "total_cost_usd": round(totals["estimated_cost_units"], 6),
         "cost_per_1000_analyses_usd": round(totals["estimated_cost_units"] / total_sig * 1000, 6),
         "drop_rate": round(totals["signals_dropped"] / total_sig, 4),
+        "cache_status": "cached" if cached_clients == len(PORTFOLIO_CLIENT_IDS) else "partial" if cached_clients else "missing",
+        "note": f"Using cached pipeline results for {cached_clients} of {len(PORTFOLIO_CLIENT_IDS)} clients; POST /api/pipeline/run populates fresh results.",
         "breakdown": [
             {"stage": "loop_a", "model_used": "local hybrid encoder (no LLM)", "tokens_used": 0, "estimated_cost_usd": 0.0, "calls": int(totals["news_queries"]), "cost_per_1000_analyses_usd": 0.0},
         ],
@@ -747,7 +729,7 @@ def health() -> dict[str, str]:
 
 @app.get("/api/portfolio")
 def get_portfolio() -> dict[str, Any]:
-    result = _get_pipeline("demo-spacex-001")
+    result = _get_cached_pipeline("demo-spacex-001")
     metrics = result.get("layer1_metrics", {})
     all_alerts = db.get_all_alerts()
     customers = get_customers()
@@ -772,6 +754,8 @@ def get_portfolio() -> dict[str, Any]:
         "layer1_drop_rate": metrics.get("drop_rate", 0.0),
         "layer1_cost_usd": metrics.get("estimated_cost_units", 0.0),
         "cost_per_1000_analyses_usd": metrics.get("estimated_cost_units_per_1000_analyses", 0.0),
+        "cache_status": metrics.get("cache_status", "cached"),
+        "note": metrics.get("note", "Using an existing cached pipeline result."),
         "customers": customers,
     }
 
@@ -798,14 +782,7 @@ def get_customer_history(customer_id: str) -> dict[str, Any]:
     client_id = CUSTOMER_TO_CLIENT_ID.get(customer_id)
     history: list[dict[str, Any]] = []
 
-    if client_id:
-        result = _get_pipeline(client_id)
-        for event in result.get("drift_events", []):
-            mapped = _map_alert(event)
-            db.upsert_alert(mapped)
-            history.append(mapped)
-
-    seen_ids = {h["id"] for h in history}
+    seen_ids: set[str] = set()
     for alert in db.get_all_alerts():
         cid = alert.get("customerId", "")
         if (cid == customer_id or cid == client_id) and alert["id"] not in seen_ids:
@@ -816,6 +793,8 @@ def get_customer_history(customer_id: str) -> dict[str, Any]:
         "customer_id": customer_id,
         "history": history,
         "total_events": len(history),
+        "cache_status": "cached" if client_id in _pipeline_cache else "missing",
+        "note": "History is read from persisted alerts; POST /api/pipeline/run populates fresh results.",
     }
 
 
@@ -826,13 +805,6 @@ def get_customer_history(customer_id: str) -> dict[str, Any]:
 @app.get("/api/alerts/{alert_id}/report")
 def get_alert_report(alert_id: str) -> dict[str, Any]:
     alert = db.get_alert(alert_id)
-    if not alert:
-        result = _get_pipeline("demo-spacex-001")
-        for event in result.get("drift_events", []):
-            if event.get("event_id") == alert_id:
-                alert = _map_alert(event)
-                db.upsert_alert(alert)
-                break
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
 
