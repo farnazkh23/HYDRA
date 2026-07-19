@@ -329,6 +329,130 @@
       "domain": "meta.com",
       "risk_rating": "medium",
       "last_kyc_review": "2026-01-20"
+    },
+    {
+      "client_id": "person_elon_musk",
+      "legal_name": "Elon Musk",
+      "entity_type": "person",
+      "jurisdiction": "US",
+      "baseline_business_model": "Public individual; Chief Executive Officer of Tesla, Inc. per Tesla Investor Relations executive profile.",
+      "expected_activity": [
+        "Public company executive disclosures as CEO of Tesla, Inc.",
+        "Public statements and media coverage attributed to this individual regarding affiliated companies",
+        "Corporate governance and Section 16 filings tied to Tesla, Inc."
+      ],
+      "expected_keywords": [
+        "Elon Musk",
+        "Tesla",
+        "SpaceX"
+      ],
+      "expected_jurisdictions": [
+        "US"
+      ],
+      "expected_monthly_volume_chf": 0,
+      "risk_appetite": "Public-figure monitoring only; neutral topics include corporate governance changes, executive disclosures, and regulatory actions involving affiliated public companies. Not an allegation record.",
+      "expected_transaction_profile": "This is a public-source monitoring profile only; it does not represent personal financial, banking, or transaction monitoring for this individual.",
+      "ownership_assumptions": [
+        "Publicly disclosed as Chief Executive Officer of Tesla, Inc. per Tesla Investor Relations."
+      ],
+      "monitored_public_entities": [
+        "Elon Musk",
+        "Tesla"
+      ],
+      "website": "https://ir.tesla.com/corporate/elon-musk",
+      "domain": "ir.tesla.com",
+      "risk_rating": "low",
+      "last_kyc_review": "2026-07-20",
+      "sources": [
+        {
+          "field": "legal_name, entity_type, baseline_business_model, expected_activity, ownership_assumptions, website, domain",
+          "publisher": "Tesla Investor Relations",
+          "url": "https://ir.tesla.com/corporate/elon-musk",
+          "accessed_date": "2026-07-20"
+        }
+      ]
+    },
+    {
+      "client_id": "person_jeff_bezos",
+      "legal_name": "Jeff Bezos",
+      "entity_type": "person",
+      "jurisdiction": "US",
+      "baseline_business_model": "Public individual; Founder and Executive Chairman of Amazon.com, Inc. per Amazon Investor Relations officer/director profile.",
+      "expected_activity": [
+        "Public company officer/director disclosures for Amazon.com, Inc.",
+        "Public statements and media coverage attributed to this individual regarding affiliated companies",
+        "Corporate governance filings tied to Amazon.com, Inc."
+      ],
+      "expected_keywords": [
+        "Jeff Bezos",
+        "Amazon"
+      ],
+      "expected_jurisdictions": [
+        "US"
+      ],
+      "expected_monthly_volume_chf": 0,
+      "risk_appetite": "Public-figure monitoring only; neutral topics include corporate governance changes, officer/director disclosures, and regulatory actions involving affiliated public companies. Not an allegation record.",
+      "expected_transaction_profile": "This is a public-source monitoring profile only; it does not represent personal financial, banking, or transaction monitoring for this individual.",
+      "ownership_assumptions": [
+        "Publicly disclosed as Founder and Executive Chairman of Amazon.com, Inc. per Amazon Investor Relations."
+      ],
+      "monitored_public_entities": [
+        "Jeff Bezos",
+        "Amazon"
+      ],
+      "website": "https://ir.aboutamazon.com/officers-and-directors/person-details/default.aspx",
+      "domain": "ir.aboutamazon.com",
+      "risk_rating": "low",
+      "last_kyc_review": "2026-07-20",
+      "sources": [
+        {
+          "field": "legal_name, entity_type, baseline_business_model, expected_activity, ownership_assumptions, website, domain",
+          "publisher": "Amazon Investor Relations",
+          "url": "https://ir.aboutamazon.com/officers-and-directors/person-details/default.aspx",
+          "accessed_date": "2026-07-20"
+        }
+      ]
+    },
+    {
+      "client_id": "person_jensen_huang",
+      "legal_name": "Jensen Huang",
+      "entity_type": "person",
+      "jurisdiction": "US",
+      "baseline_business_model": "Public individual; Co-Founder, President and Chief Executive Officer of NVIDIA Corporation per NVIDIA board of directors/management profile.",
+      "expected_activity": [
+        "Public company executive and board disclosures as President and CEO of NVIDIA Corporation",
+        "Public statements and media coverage attributed to this individual regarding affiliated companies",
+        "Corporate governance filings tied to NVIDIA Corporation"
+      ],
+      "expected_keywords": [
+        "Jensen Huang",
+        "NVIDIA"
+      ],
+      "expected_jurisdictions": [
+        "US"
+      ],
+      "expected_monthly_volume_chf": 0,
+      "risk_appetite": "Public-figure monitoring only; neutral topics include corporate governance changes, executive disclosures, and regulatory actions involving affiliated public companies. Not an allegation record.",
+      "expected_transaction_profile": "This is a public-source monitoring profile only; it does not represent personal financial, banking, or transaction monitoring for this individual.",
+      "ownership_assumptions": [
+        "Publicly disclosed as Co-Founder, President and Chief Executive Officer of NVIDIA Corporation per NVIDIA's board of directors page."
+      ],
+      "monitored_public_entities": [
+        "Jensen Huang",
+        "NVIDIA"
+      ],
+      "website": "https://www.nvidia.com/en-gb/about-nvidia/board-of-directors/jensen-huang/",
+      "domain": "nvidia.com",
+      "risk_rating": "low",
+      "last_kyc_review": "2026-07-20",
+      "sources": [
+        {
+          "field": "legal_name, entity_type, baseline_business_model, expected_activity, ownership_assumptions, website, domain",
+          "publisher": "NVIDIA",
+          "url": "https://www.nvidia.com/en-gb/about-nvidia/board-of-directors/jensen-huang/",
+          "accessed_date": "2026-07-20"
+        }
+      ]
     }
   ]
 }
