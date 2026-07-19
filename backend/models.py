@@ -179,6 +179,7 @@ class RawSignal(BaseModel):
 class Layer1KycBaseline(BaseModel):
     client_id: str
     legal_name: str
+    entity_type: str = "organization"
     jurisdiction: str
     baseline_business_model: str
     expected_activity: list[str] = Field(default_factory=list)
@@ -194,6 +195,7 @@ class Layer1KycBaseline(BaseModel):
     domain: str = ""
     risk_rating: str
     last_kyc_review: str
+    sources: list[dict[str, str]] = Field(default_factory=list)
 
 
 class DriftEvent(BaseModel):
