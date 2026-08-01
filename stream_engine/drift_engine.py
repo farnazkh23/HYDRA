@@ -119,6 +119,10 @@ class KeywordDriftEngine:
                     "url": str(signal.metadata.get("url", "")),
                     "published_at": str(signal.metadata.get("published_at", signal.timestamp.isoformat())),
                     "source": signal.source,
+                    "provider": str(signal.metadata.get("provider") or ""),
+                    "query": str(signal.metadata.get("query") or ""),
+                    "matched_risk_terms": matched_risk_terms,
+                    "reason": rationale,
                 }
             ],
             loop_a_trace={

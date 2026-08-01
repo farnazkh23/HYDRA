@@ -213,7 +213,7 @@ class DriftEvent(BaseModel):
     scoring_breakdown: dict[str, float] = Field(default_factory=dict)
     rationale: str
     recommended_action: str
-    citations: list[dict[str, str]]
+    citations: list[dict[str, Any]]
     loop_a_trace: dict[str, Any] = Field(default_factory=dict)
     source_metadata: dict[str, Any] = Field(default_factory=dict)
     layer1_cost_units: dict[str, float]
