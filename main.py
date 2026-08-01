@@ -257,6 +257,41 @@ def run_layer1_pipeline(
     }
 
 
+def _build_news_query_terms(baseline: Layer1KycBaseline, max_terms: int = 5) -> list[str]:
+    candidates = [
+        baseline.legal_name,
+        *baseline.monitored_public_entities,
+        *baseline.expected_keywords,
+    ]
+    terms: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        term = candidate.strip()
+        key = term.lower()
+        if not term or key in seen:
+            continue
+        seen.add(key)
+        terms.append(term)
+        if len(terms) == max_terms:
+            break
+    return terms
+
+
+def _dedupe_signals_by_identity(signals: list[RawSignal]) -> list[RawSignal]:
+    seen: set[str] = set()
+    deduped: list[RawSignal] = []
+    for signal in signals:
+        signal_id = str(signal.metadata.get("signal_id", "")).strip().lower()
+        url = str(signal.metadata.get("url", "")).strip().lower()
+        title = str(signal.metadata.get("title", "")).strip().lower()
+        key = signal_id or url or title
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(signal)
+    return deduped
+
+
 def _load_or_collect_signals(
     baseline: Layer1KycBaseline,
     limit: int,
@@ -271,12 +306,19 @@ def _load_or_collect_signals(
         enabled=live,
         expand_adverse_queries=expand_adverse_news,
     )
-    signals = news_collector.fetch_company_news(
-        client_id=baseline.client_id,
-        company_name=baseline.legal_name,
-        limit=limit,
-    )
-    return signals, news_collector.last_query_count if live else 0
+    signals: list[RawSignal] = []
+    query_count = 0
+    for query_term in _build_news_query_terms(baseline):
+        signals.extend(
+            news_collector.fetch_company_news(
+                client_id=baseline.client_id,
+                company_name=query_term,
+                limit=limit,
+            )
+        )
+        query_count += news_collector.last_query_count
+    signals = _dedupe_signals_by_identity(signals)[:limit]
+    return signals, query_count if live else 0
 
 
 def _drop_reason(baseline: Layer1KycBaseline, signal: RawSignal) -> str:
