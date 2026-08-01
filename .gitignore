@@ -2,9 +2,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .DS_Store
-data/layer1_replay/
-data/layer1_vae_snapshots/
-data/layer1_audit_logs/
+
+# Runtime data (generated at runtime, e.g. backend/db.py's data/db.json)
+data/
 
 # Local backups
 frontend_backup_*/
@@ -30,9 +30,6 @@ frontend/.env
 frontend/.env.local
 frontend/.env.development.local
 frontend/.env.production.local
-data/layer1_replay*/
-data/layer1_vae_snapshots*/
-data/layer1_audit_logs*/
 
 # Python virtual environment
 .venv/
