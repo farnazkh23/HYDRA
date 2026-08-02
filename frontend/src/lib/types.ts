@@ -23,6 +23,17 @@ export interface Customer {
   trend: "up" | "down" | "flat";
 }
 
+export interface Citation {
+  title?: string;
+  url?: string;
+  published_at?: string;
+  source?: string;
+  provider?: string;
+  query?: string;
+  matched_risk_terms?: string[];
+  reason?: string;
+}
+
 export interface Alert {
   id: string;
   customerId: string;
@@ -33,6 +44,14 @@ export interface Alert {
   timestamp: string;
   explanation: string;
   status: "open" | "investigating" | "dismissed";
+  // Backend-enriched fields; absent on the static mock fallback.
+  matchedRiskTerms?: string[];
+  missingBaselineTerms?: string[];
+  driftScore?: number;
+  recommendedAction?: string;
+  citations?: Citation[];
+  reasoningTrace?: AIReasoningTrace | null;
+  governance?: GovernanceRecord | null;
 }
 
 export interface GraphNode {
@@ -75,11 +94,11 @@ export interface AIReasoningTrace {
     cost_usd: number;
   };
   loop_b: {
-    graphrag: { triple_status: string; new_entity: string; timestamp_slice: string };
+    graphrag: { triple_status: string; new_entity: string; timestamp_slice: string } | null;
     timegpt: { horizon_days: number; anomaly_score: number; uncertainty: [number, number]; summary: string };
     survival: { model: string; time_to_decay_days: number; confidence: number; summary: string };
     router: { path: string; reason: string; model: string; tokens: number; cost_usd: number };
-  };
+  } | null;
   audit_citations: string[];
   guardrail_checks: string[];
   hallucination_check_passed: boolean;

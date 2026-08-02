@@ -442,36 +442,52 @@ function EngineAnalysis({ trace }: { trace: AIReasoningTrace }) {
           </Grid>
         )}
         {tab === "graphrag" && (
-          <Grid>
-            <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
-            <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
-            <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
-          </Grid>
+          trace.loop_b?.graphrag ? (
+            <Grid>
+              <Kv k="New entity" v={trace.loop_b.graphrag.new_entity} />
+              <Kv k="Triple status" v={trace.loop_b.graphrag.triple_status} />
+              <Kv k="Timestamp slice" v={trace.loop_b.graphrag.timestamp_slice} />
+            </Grid>
+          ) : (
+            <p className="text-xs text-muted-foreground">Layer 2 forecasting was not run for this alert.</p>
+          )
         )}
         {tab === "timegpt" && (
-          <Grid>
-            <Kv k="Forecast horizon" v={`${trace.loop_b.timegpt.horizon_days} days`} />
-            <Kv k="Anomaly score" v={trace.loop_b.timegpt.anomaly_score} highlight />
-            <Kv k="Uncertainty interval" v={`${trace.loop_b.timegpt.uncertainty[0]} – ${trace.loop_b.timegpt.uncertainty[1]}`} />
-            <div className="col-span-full text-foreground/90">{trace.loop_b.timegpt.summary}</div>
-          </Grid>
+          trace.loop_b ? (
+            <Grid>
+              <Kv k="Forecast horizon" v={`${trace.loop_b.timegpt.horizon_days} days`} />
+              <Kv k="Anomaly score" v={trace.loop_b.timegpt.anomaly_score} highlight />
+              <Kv k="Uncertainty interval" v={`${trace.loop_b.timegpt.uncertainty[0]} – ${trace.loop_b.timegpt.uncertainty[1]}`} />
+              <div className="col-span-full text-foreground/90">{trace.loop_b.timegpt.summary}</div>
+            </Grid>
+          ) : (
+            <p className="text-xs text-muted-foreground">Layer 2 forecasting was not run for this alert.</p>
+          )
         )}
         {tab === "survival" && (
-          <Grid>
-            <Kv k="Model" v={trace.loop_b.survival.model} />
-            <Kv k="Time-to-decay" v={`${trace.loop_b.survival.time_to_decay_days} days`} highlight />
-            <Kv k="Confidence" v={`${Math.round(trace.loop_b.survival.confidence * 100)}%`} />
-            <div className="col-span-full text-foreground/90">{trace.loop_b.survival.summary}</div>
-          </Grid>
+          trace.loop_b ? (
+            <Grid>
+              <Kv k="Model" v={trace.loop_b.survival.model} />
+              <Kv k="Time-to-decay" v={`${trace.loop_b.survival.time_to_decay_days} days`} highlight />
+              <Kv k="Confidence" v={`${Math.round(trace.loop_b.survival.confidence * 100)}%`} />
+              <div className="col-span-full text-foreground/90">{trace.loop_b.survival.summary}</div>
+            </Grid>
+          ) : (
+            <p className="text-xs text-muted-foreground">Layer 2 forecasting was not run for this alert.</p>
+          )
         )}
         {tab === "router" && (
-          <Grid>
-            <Kv k="Path" v={trace.loop_b.router.path.toUpperCase()} highlight />
-            <Kv k="Reason" v={trace.loop_b.router.reason} />
-            <Kv k="Model" v={trace.loop_b.router.model} />
-            <Kv k="Tokens" v={trace.loop_b.router.tokens} />
-            <Kv k="Cost" v={`$${trace.loop_b.router.cost_usd}`} />
-          </Grid>
+          trace.loop_b ? (
+            <Grid>
+              <Kv k="Path" v={trace.loop_b.router.path.toUpperCase()} highlight />
+              <Kv k="Reason" v={trace.loop_b.router.reason} />
+              <Kv k="Model" v={trace.loop_b.router.model} />
+              <Kv k="Tokens" v={trace.loop_b.router.tokens} />
+              <Kv k="Cost" v={`$${trace.loop_b.router.cost_usd}`} />
+            </Grid>
+          ) : (
+            <p className="text-xs text-muted-foreground">Layer 2 forecasting was not run for this alert.</p>
+          )
         )}
         {tab === "guardrails" && (
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">

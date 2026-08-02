@@ -7,7 +7,6 @@ import {
   Clock,
   Cpu,
   ExternalLink,
-  CheckCircle2,
   ShieldAlert,
   UserPlus,
   XCircle,
@@ -30,12 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  getAlertById,
-  getGovernanceRecord,
-  getKYCDriftRecord,
-  getReasoningTrace,
-} from "@/lib/services";
+import { getAlertById, getKYCDriftRecord } from "@/lib/services";
 import type {
   AIReasoningTrace,
   Alert,
@@ -89,15 +83,13 @@ function InvestigationPage() {
       }
       setAlert(a);
       setStatus((a.status as CaseStatus) ?? "open");
-      const [t, d, g] = await Promise.all([
-        getReasoningTrace(a.id),
-        getKYCDriftRecord(a.customerId),
-        getGovernanceRecord(a.id),
-      ]);
+      // Trace and governance are embedded directly on the backend alert
+      // response; only KYC drift lives behind its own endpoint.
+      const d = await getKYCDriftRecord(a.customerId);
       if (cancelled) return;
-      setTrace(t ?? null);
+      setTrace(a.reasoningTrace ?? null);
+      setGov(a.governance ?? null);
       setDrift(d ?? null);
-      setGov(g ?? null);
       setLoading(false);
     })();
     return () => {
@@ -107,19 +99,27 @@ function InvestigationPage() {
 
   const summary = useMemo(() => {
     if (!alert) return "";
-    const tg = trace?.loop_b.timegpt.summary;
-    const sv = trace?.loop_b.survival.summary;
+    const tg = trace?.loop_b?.timegpt?.summary;
+    const sv = trace?.loop_b?.survival?.summary;
     return [
       `${alert.driftType} detected for ${alert.customerName}.`,
       tg ? `TimeGPT: ${tg}.` : null,
       sv ? `Survival model: ${sv}.` : null,
-      trace?.loop_b.router.path === "heavy"
+      trace?.loop_b?.router.path === "heavy"
         ? "Routed to heavy reasoning path for escalation."
         : null,
     ]
       .filter(Boolean)
       .join(" ");
   }, [alert, trace]);
+
+  const sourceLabel = useMemo(() => {
+    if (!alert?.citations?.length) return "—";
+    const sources = new Set(
+      alert.citations.map((c) => c.provider ?? c.source).filter(Boolean) as string[],
+    );
+    return sources.size ? Array.from(sources).join(" / ") : "—";
+  }, [alert]);
 
   if (loading && !alert) {
     return (
@@ -260,12 +260,29 @@ function InvestigationPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <KV k="Entity" v={alert.customerName} />
                 <KV k="Signal type" v={alert.driftType} />
-                <KV k="Source" v="OpenCorporates / GLEIF" />
+                <KV k="Source" v={sourceLabel} />
                 <KV k="Timestamp" v={alert.timestamp} />
               </div>
               <p className="mt-4 text-sm text-foreground/90 border-t border-border pt-3">
                 {alert.explanation}
               </p>
+              {!!alert.matchedRiskTerms?.length && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Matched risk terms
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {alert.matchedRiskTerms.map((term) => (
+                      <span
+                        key={term}
+                        className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-xs font-mono"
+                      >
+                        {term}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Section>
 
             {/* B. AI Reasoning Trace */}
@@ -280,21 +297,27 @@ function InvestigationPage() {
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Stat label="Router path" v={trace.loop_b.router.path} />
-                  <Stat label="Model" v={trace.loop_b.router.model} />
+                  <Stat label="Router path" v={trace.loop_b?.router.path ?? "—"} />
+                  <Stat label="Model" v={trace.loop_b?.router.model ?? "—"} />
                   <Stat label="Tokens" v={String(trace.total_tokens_used)} />
                   <Stat label="Cost" v={`$${trace.total_cost_usd}`} />
                 </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <SubCard title="Forecast (TimeGPT)">
-                    {trace.loop_b.timegpt.summary} · anomaly score{" "}
-                    {trace.loop_b.timegpt.anomaly_score}
-                  </SubCard>
-                  <SubCard title="Survival model">
-                    {trace.loop_b.survival.summary} · confidence{" "}
-                    {trace.loop_b.survival.confidence}
-                  </SubCard>
-                </div>
+                {trace.loop_b ? (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <SubCard title="Forecast (TimeGPT)">
+                      {trace.loop_b.timegpt.summary} · anomaly score{" "}
+                      {trace.loop_b.timegpt.anomaly_score}
+                    </SubCard>
+                    <SubCard title="Survival model">
+                      {trace.loop_b.survival.summary} · confidence{" "}
+                      {trace.loop_b.survival.confidence}
+                    </SubCard>
+                  </div>
+                ) : (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Layer 2 forecasting was not run for this alert.
+                  </p>
+                )}
               </Section>
             )}
 
@@ -330,38 +353,43 @@ function InvestigationPage() {
               </Section>
             )}
 
-            {/* D. Audit Citations */}
-            {trace && (
-              <Section title="Audit Citations" icon={<Network size={14} />}>
+            {/* D. Citations */}
+            {!!alert.citations?.length && (
+              <Section title="Citations" icon={<Network size={14} />}>
                 <ul className="space-y-2">
-                  {trace.audit_citations.map((c) => {
-                    const [source, ref] = c.split("#");
-                    return (
-                      <li
-                        key={c}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/60 px-3 py-2.5 hover:border-neon/40 hover:bg-surface-2 transition-colors"
-                      >
+                  {alert.citations.map((c, i) => (
+                    <li
+                      key={`${c.url ?? c.title}-${i}`}
+                      className="rounded-lg border border-border bg-surface-2/60 px-3 py-2.5 hover:border-neon/40 hover:bg-surface-2 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-sm font-medium">{source}</div>
+                          <div className="text-sm font-medium truncate">
+                            {c.title ?? "Untitled source"}
+                          </div>
                           <div className="text-xs text-muted-foreground font-mono truncate">
-                            ref · {ref}
+                            {c.provider ?? c.source ?? "unknown source"}
+                            {c.query ? ` · query: "${c.query}"` : ""}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-[11px] text-[color:var(--risk-low)]">
-                            <CheckCircle2 size={12} /> verified
-                          </span>
+                        {c.url && (
                           <a
-                            href="#"
-                            onClick={(e) => e.preventDefault()}
-                            className="inline-flex items-center gap-1 text-[11px] text-neon hover:underline"
+                            href={c.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 inline-flex items-center gap-1 text-[11px] text-neon hover:underline"
                           >
                             open <ExternalLink size={11} />
                           </a>
-                        </div>
-                      </li>
-                    );
-                  })}
+                        )}
+                      </div>
+                      {c.reason && (
+                        <p className="mt-1.5 text-xs text-foreground/80 border-t border-border/60 pt-1.5">
+                          {c.reason}
+                        </p>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               </Section>
             )}
@@ -383,11 +411,15 @@ function InvestigationPage() {
             {/* F. Recommended Action */}
             <Section title="Recommended Action" icon={<Sparkles size={14} />}>
               <p className="text-sm text-foreground/90 mb-4">
-                Escalate to senior compliance and request re-KYC due to{" "}
-                <span className="text-foreground font-medium">
-                  {drift?.drifted_fields[0]?.field ?? "drift"}
-                </span>{" "}
-                change.
+                {alert.recommendedAction ?? (
+                  <>
+                    Escalate to senior compliance and request re-KYC due to{" "}
+                    <span className="text-foreground font-medium">
+                      {drift?.drifted_fields[0]?.field ?? "drift"}
+                    </span>{" "}
+                    change.
+                  </>
+                )}
               </p>
               <div className="grid grid-cols-1 gap-2">
                 <Button

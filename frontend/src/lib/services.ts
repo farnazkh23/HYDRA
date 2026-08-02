@@ -114,6 +114,7 @@ export async function getAlerts(): Promise<Alert[]> {
 }
 
 export async function getAlertById(id: string): Promise<Alert | undefined> {
+  await bootstrapReplayDemo();
   return liveOrMock<Alert | undefined>(
     `/alerts/${id}`,
     alerts.find((alert) => alert.id === id),
