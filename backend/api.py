@@ -51,6 +51,8 @@ app.add_middleware(
 
 _pipeline_cache: dict[str, Any] = {}   # client_id → raw pipeline result
 
+REPLAY_FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures" / "layer1_replay"
+
 PORTFOLIO_CLIENT_IDS = (
     "demo-spacex-001",
     "demo-amazon-001",
@@ -695,13 +697,46 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     client_id = body.get("client_id", "demo-spacex-001")
     live = bool(body.get("live", False))
     expand_adverse = bool(body.get("expand_adverse_news", False))
+    replay_fixture_requested = bool(body.get("replay_fixture", False))
+
+    replay_file: str | None = None
+    if replay_fixture_requested:
+        fixture_path = REPLAY_FIXTURES_DIR / client_id / "raw_signals.jsonl"
+        if not fixture_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "replay_fixture_not_found",
+                    "note": (
+                        f"replay_fixture was true but no committed fixture exists at "
+                        f"{fixture_path}. Add one under "
+                        f"tests/fixtures/layer1_replay/{client_id}/raw_signals.jsonl, "
+                        f"or send replay_fixture=false."
+                    ),
+                },
+            )
+        replay_file = str(fixture_path)
+
     _invalidate_cache(client_id)
-    result = run_layer1_pipeline(client_id=client_id, limit=10, live=live, expand_adverse_news=expand_adverse)
+    result = run_layer1_pipeline(
+        client_id=client_id,
+        limit=10,
+        live=live,
+        replay_file=replay_file,
+        expand_adverse_news=expand_adverse,
+    )
     _pipeline_cache[client_id] = result
     alerts = [_map_alert(e) for e in result.get("drift_events", [])]
     for a in alerts:
         db.upsert_alert(a)
     metrics = result.get("layer1_metrics", {})
+    note = (
+        "This endpoint performs live processing: it invalidates the cached "
+        "pipeline result for this client and re-runs signal collection, "
+        "drift detection, and alert enrichment before returning."
+    )
+    if replay_file:
+        note += f" Replay fixture used: {replay_file}."
     return {
         "status": "ok",
         "client_id": client_id,
@@ -710,11 +745,8 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         "drift_events": metrics.get("events_emitted", 0),
         "alerts": alerts,
         "alerts_available": len(alerts),
-        "note": (
-            "This endpoint performs live processing: it invalidates the cached "
-            "pipeline result for this client and re-runs signal collection, "
-            "drift detection, and alert enrichment before returning."
-        ),
+        "replay_fixture_used": replay_file is not None,
+        "note": note,
     }
 
 
