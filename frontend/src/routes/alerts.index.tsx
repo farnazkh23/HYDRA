@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RiskBadge } from "@/components/ui/risk-badge";
-import { alerts as allAlerts } from "@/lib/mock-data";
-import type { RiskStatus } from "@/lib/types";
+import { getAlerts } from "@/lib/services";
+import type { Alert, RiskStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/alerts/")({
   head: () => ({ meta: [{ title: "Alerts — HYDRA" }] }),
@@ -14,8 +15,18 @@ const sevOrder: Record<string, number> = { high: 0, elevated: 1, medium: 2, low:
 
 function AlertsPage() {
   const navigate = useNavigate();
-  const alerts = [...allAlerts].sort(
-    (x, y) => (sevOrder[x.severity] ?? 9) - (sevOrder[y.severity] ?? 9),
+  const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
+
+  useEffect(() => {
+    getAlerts().then(setAllAlerts);
+  }, []);
+
+  const alerts = useMemo(
+    () =>
+      [...allAlerts].sort(
+        (x, y) => (sevOrder[x.severity] ?? 9) - (sevOrder[y.severity] ?? 9),
+      ),
+    [allAlerts],
   );
 
   return (

@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { bootstrapReplayDemo } from "../lib/services";
 import { ThemeProvider, themeInitScript } from "../components/theme-provider";
 import { Toaster } from "../components/ui/sonner";
 import { WalkthroughProvider } from "../components/walkthrough/WalkthroughProvider";
@@ -124,6 +125,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    bootstrapReplayDemo();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
