@@ -241,6 +241,31 @@ class Layer1PipelineTests(unittest.TestCase):
                 "irrelevant_to_monitored_client",
             )
 
+    def test_replay_fixture_person_elon_musk_produces_deterministic_demo_alerts(self) -> None:
+        """Committed offline replay fixture backing the management demo (no network)."""
+        fixture_file = (
+            Path(__file__).parent / "fixtures" / "layer1_replay" / "person_elon_musk" / "raw_signals.jsonl"
+        )
+
+        payload = run_layer1_pipeline(
+            client_id="person_elon_musk",
+            limit=10,
+            live=False,
+            replay_file=str(fixture_file),
+        )
+
+        self.assertGreater(len(payload["raw_signals"]), 0)
+        self.assertGreater(len(payload["dropped_signals"]), 0)
+        self.assertGreater(len(payload["drift_events"]), 0)
+        self.assertEqual(payload["layer1_metrics"]["mode"], "replay")
+
+        for event in payload["drift_events"]:
+            citation = event["citations"][0]
+            for field in ("title", "url", "provider", "query", "reason"):
+                self.assertIn(field, citation)
+                self.assertTrue(citation[field])
+            self.assertEqual(citation["provider"], "demo_replay_fixture")
+
     def test_drift_event_citation_carries_full_evidence_fields(self) -> None:
         baseline = load_layer1_baselines()["demo-spacex-001"]
         risky_signal = list(mock_company_news(baseline.client_id, baseline.legal_name))[1]
