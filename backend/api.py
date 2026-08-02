@@ -299,6 +299,22 @@ def _fmt_time(iso: str) -> str:
         return iso
 
 
+def _compute_approval_deadline(event: dict[str, Any]) -> str | None:
+    """24h SLA from the alert's triggered_at, per the GovernanceRecord convention
+    in README.md (Initial AI Flag -> approval_deadline is a fixed +24h window).
+    Returns None if triggered_at is missing/unparseable rather than guessing a date.
+    """
+    from datetime import datetime, timedelta
+
+    triggered_at = event.get("triggered_at", "")
+    try:
+        dt = datetime.fromisoformat(str(triggered_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    deadline = dt + timedelta(hours=24)
+    return deadline.strftime("%Y-%m-%d %H:%M UTC")
+
+
 def _build_governance(event: dict[str, Any]) -> dict[str, Any]:
     return {
         "record_id": f"gov-{event.get('event_id', uuid.uuid4().hex)[:8]}",
@@ -306,7 +322,7 @@ def _build_governance(event: dict[str, Any]) -> dict[str, Any]:
         "status": "awaiting_analyst",
         "steps": ["signal_received", "drift_gate_passed", "guardrails_passed", "routed_to_queue"],
         "requires_manual_approval": True,
-        "approval_deadline": "2026-06-22 17:00 UTC",
+        "approval_deadline": _compute_approval_deadline(event),
         "final_decision": "pending",
     }
 
@@ -730,13 +746,24 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     for a in alerts:
         db.upsert_alert(a)
     metrics = result.get("layer1_metrics", {})
-    note = (
-        "This endpoint performs live processing: it invalidates the cached "
-        "pipeline result for this client and re-runs signal collection, "
-        "drift detection, and alert enrichment before returning."
-    )
     if replay_file:
-        note += f" Replay fixture used: {replay_file}."
+        note = (
+            f"Deterministic replay fixture used ({replay_file}); no live API "
+            "call was required. Cached pipeline result for this client was "
+            "invalidated and re-derived from the fixture."
+        )
+    elif live:
+        note = (
+            "This endpoint performed live processing: it invalidated the cached "
+            "pipeline result for this client and re-ran signal collection, "
+            "drift detection, and alert enrichment before returning."
+        )
+    else:
+        note = (
+            "Offline run: no live collection or replay fixture was used. "
+            "Cached pipeline result for this client was invalidated and "
+            "re-derived from locally available data."
+        )
     return {
         "status": "ok",
         "client_id": client_id,
