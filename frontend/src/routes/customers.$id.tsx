@@ -2,12 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, BadgeCheck, Building2, MapPin, Calendar, ShieldCheck,
-  TrendingUp, AlertTriangle, Download, MoreHorizontal,
+  TrendingUp, AlertTriangle, Download, MoreHorizontal, Info,
   Globe2, ArrowLeftRight, UserPlus, Activity, ChevronRight,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RiskBadge } from "@/components/ui/risk-badge";
-import { getCustomerById, getKYCDriftRecord, getReasoningTrace, getAlerts } from "@/lib/services";
+import { getCustomerById, getKYCDriftRecord, getAlerts } from "@/lib/services";
 import type { Customer, KYCDriftRecord, AIReasoningTrace, Alert, RiskStatus } from "@/lib/types";
 
 export const Route = createFileRoute("/customers/$id")({
@@ -20,18 +20,59 @@ const driftPoints = [22, 28, 31, 30, 38, 44, 50, 55, 60, 64, 68, 75, 81];
 function CustomerDetail() {
   const { id } = Route.useParams();
   const [c, setC] = useState<Customer | null>(null);
+  const [customerChecked, setCustomerChecked] = useState(false);
   const [drift, setDrift] = useState<KYCDriftRecord | null>(null);
-  const [trace, setTrace] = useState<AIReasoningTrace | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alertsChecked, setAlertsChecked] = useState(false);
 
   useEffect(() => {
-    getCustomerById(id).then((x) => setC(x ?? null));
+    setC(null);
+    setCustomerChecked(false);
+    setDrift(null);
+    setAlerts([]);
+    setAlertsChecked(false);
+
+    getCustomerById(id).then((x) => {
+      setC(x ?? null);
+      setCustomerChecked(true);
+    });
     getKYCDriftRecord(id).then((x) => setDrift(x ?? null));
-    getReasoningTrace("a-1001").then((x) => setTrace(x ?? null));
-    getAlerts().then((a) => setAlerts(a.filter((x) => x.customerId === id)));
+    getAlerts().then((a) => {
+      setAlerts(a.filter((x) => x.customerId === id));
+      setAlertsChecked(true);
+    });
   }, [id]);
 
-  if (!c) return <AppLayout><div className="p-10 text-muted-foreground">Loading…</div></AppLayout>;
+  // Real backend alerts already carry their own reasoning trace; use that
+  // instead of fetching a fixed/unrelated trace by literal alert id.
+  const trace = alerts.find((a) => a.reasoningTrace)?.reasoningTrace ?? null;
+
+  if (!customerChecked || !alertsChecked) {
+    return <AppLayout><div className="p-10 text-muted-foreground">Loading…</div></AppLayout>;
+  }
+
+  if (!c && alerts.length === 0) {
+    return (
+      <AppLayout>
+        <div className="px-6 lg:px-10 py-16">
+          <Link
+            to="/customers"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-neon mb-4"
+          >
+            <ArrowLeft size={14} /> Back to Customers
+          </Link>
+          <h1 className="text-2xl font-display font-semibold">Customer not found</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            No customer profile or alert data exists for <span className="font-mono">{id}</span>.
+          </p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!c) {
+    return <ReplayCustomerSummary id={id} alerts={alerts} trace={trace} />;
+  }
 
   return (
     <AppLayout>
@@ -232,6 +273,81 @@ function CustomerDetail() {
             {/* KYC Drift Diff */}
             {drift && <KYCDriftCard record={drift} />}
           </div>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+/**
+ * Shown when there is no full KYC customer profile on file (e.g. the
+ * "person_elon_musk" replay entity), but real backend alert data exists for
+ * this id. Only real alert/trace fields are shown — no fabricated
+ * profile, financials, or "live KYC" claims.
+ */
+function ReplayCustomerSummary({
+  id,
+  alerts,
+  trace,
+}: {
+  id: string;
+  alerts: Alert[];
+  trace: AIReasoningTrace | null;
+}) {
+  const name = alerts[0]?.customerName ?? id;
+
+  return (
+    <AppLayout>
+      <div className="px-6 lg:px-10 py-8 max-w-[1600px]">
+        <Link to="/customers" className="inline-flex items-center gap-2 text-sm text-neon hover:underline mb-5">
+          <ArrowLeft size={16} /> Back to Customers
+        </Link>
+
+        <div className="rounded-2xl border border-neon/25 bg-neon-soft/20 p-4 mb-6 flex items-start gap-3">
+          <Info size={16} className="text-neon mt-0.5 shrink-0" />
+          <div className="text-sm text-foreground/90">
+            <span className="font-medium">Replay / demo data.</span> No full KYC customer
+            profile is on file for this entity — this summary is built from replay alert
+            data only. It is not a live customer record.
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mb-6">
+          <h1 className="font-display text-3xl font-semibold">{name}</h1>
+        </div>
+        <div className="text-sm text-muted-foreground mb-8">
+          Customer ID: <span className="font-mono text-foreground/80">{id}</span>
+        </div>
+
+        <div className="space-y-5">
+          <Card title="Alerts for this entity" icon={<AlertTriangle size={14} />}>
+            {alerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No alerts on file.</p>
+            ) : (
+              <ul className="space-y-3">
+                {alerts.map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      to="/alerts/$id"
+                      params={{ id: a.id }}
+                      className="flex items-start gap-3 rounded-lg border border-border bg-surface-2/60 px-3 py-2.5 hover:border-neon/40 hover:bg-surface-2 transition-colors"
+                    >
+                      <AlertTriangle size={16} className={sevText(a.severity)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{a.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {a.driftType} · {a.timestamp}
+                        </div>
+                      </div>
+                      <RiskBadge level={a.severity} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {trace && <EngineAnalysis trace={trace} />}
         </div>
       </div>
     </AppLayout>
