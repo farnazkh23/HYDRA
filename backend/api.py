@@ -552,8 +552,9 @@ def _graph_from_db_kg_updates() -> dict[str, Any] | None:
     seen: set[tuple[str, str, str]] = set()
 
     for alert in db.get_all_alerts():
-        kg = alert.get("reasoningTrace", {}).get("kg_update", {})
-        if kg.get("status") != "applied":
+        trace = alert.get("reasoningTrace") or {}
+        kg = trace.get("kg_update")
+        if not isinstance(kg, dict) or kg.get("status") != "applied":
             continue
         for triple in kg.get("triples_added", []):
             from_name = triple.get("node_from", "")
