@@ -16,9 +16,18 @@ const sevOrder: Record<string, number> = { high: 0, elevated: 1, medium: 2, low:
 function AlertsPage() {
   const navigate = useNavigate();
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAlerts().then(setAllAlerts);
+    let cancelled = false;
+    getAlerts().then((data) => {
+      if (cancelled) return;
+      setAllAlerts(data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const alerts = useMemo(
@@ -41,6 +50,12 @@ function AlertsPage() {
             Sorted by severity. Click a row to open the full investigation.
           </p>
         </header>
+
+        {!loading && alerts.length === 0 && (
+          <div className="rounded-xl border border-border bg-card glass px-6 py-12 text-center">
+            <p className="text-sm text-muted-foreground">No alerts to review right now.</p>
+          </div>
+        )}
 
         <div className="space-y-2">
           {alerts.map((a) => (

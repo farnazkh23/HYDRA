@@ -1,5 +1,4 @@
 ﻿import {
-  alerts,
   customers,
   governance,
   graphEdges,
@@ -108,17 +107,19 @@ export async function getAlerts(): Promise<Alert[]> {
     const data = await fetchJson<unknown>("/alerts");
     return unwrapList<Alert>(data);
   } catch (error) {
-    console.warn("Using mock alerts fallback", error);
-    return alerts;
+    console.warn("Failed to load alerts from backend", error);
+    return [];
   }
 }
 
 export async function getAlertById(id: string): Promise<Alert | undefined> {
   await bootstrapReplayDemo();
-  return liveOrMock<Alert | undefined>(
-    `/alerts/${id}`,
-    alerts.find((alert) => alert.id === id),
-  );
+  try {
+    return await fetchJson<Alert>(`/alerts/${id}`);
+  } catch (error) {
+    console.warn(`Failed to load alert ${id} from backend`, error);
+    return undefined;
+  }
 }
 
 export async function getGraph(): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
