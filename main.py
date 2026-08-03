@@ -123,13 +123,21 @@ async def execute_hydra_pipeline(drift_event: dict[str, Any], transaction_histor
     layer1_citations = [c.get("url", "Internal Source") for c in drift_event.get("citations", [])]
     all_citations = list(set(final_audit_log.audit_citations + layer1_citations))
 
+    model_status = {
+        "timegpt": {"engine_status": ts_metrics.get("engine_status", "unknown")},
+        "survival_model": {"mode": "heuristic_proxy" if survival_model.is_mocked else "trained_weights"},
+        "graph_fusion": {"mode": "live_neo4j" if graph_engine.driver is not None else "local_fallback"},
+        "router": {"mode": "live_apertus" if router.client is not None else "local_fallback"},
+    }
+
     print("\n================== DEFINITIVE AUDIT LOG OUTPUT ==================")
     print(f"Risk Rating Token : {final_audit_log.risk_token}")
     print(f"Compliance Audit  : {final_audit_log.chain_of_thought}")
     print(f"Source Citations  : {all_citations}")
     print(f"Pipeline Budget   : {router.token_ledger}")
+    print(f"Model Status      : {model_status}")
     print("=================================================================\n")
-    return final_audit_log
+    return {"audit_log": final_audit_log, "model_status": model_status}
 
 
 # --- LAYER 1 INFRASTRUCTURE WITH SNAPSHOT & LOCAL AUDIT ARCHIVING ---
@@ -475,7 +483,7 @@ def main() -> None:
 
     # Sequentially cascade high-risk events through the active multi-modal survival loops
     for event in drift_events:
-        asyncio.run(execute_hydra_pipeline(event, history_df))
+        asyncio.run(execute_hydra_pipeline(event, history_df))  # result discarded here; see backend/api.py for consumption
 
 
 if __name__ == "__main__":

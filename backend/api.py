@@ -156,7 +156,7 @@ def _map_reasoning_trace(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
+def _map_loop_b(audit_log: Any, drift_event: dict[str, Any], model_status: dict[str, Any]) -> dict[str, Any]:
     """
     Map the Layer 2 router output to the frontend Loop B shape.
 
@@ -205,6 +205,9 @@ def _map_loop_b(audit_log: Any, drift_event: dict[str, Any]) -> dict[str, Any]:
         "graphrag": None,   # populated after KG update in get_alerts()
         "audit_citations": citations,
         "chain_of_thought": cot,
+        # Which analytic_engine components actually ran live vs local fallback
+        # for this event (see main.execute_hydra_pipeline's model_status build).
+        "model_status": model_status,
     }
 
 
@@ -217,10 +220,12 @@ def _run_layer2(drift_event: dict[str, Any]) -> dict[str, Any] | None:
         dates = pd.date_range(start="2026-05-01", end="2026-06-21", freq="D")
         volumes = [150] * (len(dates) - 1) + [2_500_000]
         history_df = pd.DataFrame({"timestamp": dates, "value": volumes})
-        audit_log = asyncio.run(_execute_hydra_pipeline(drift_event, history_df))
-        if audit_log is None:
+        result = asyncio.run(_execute_hydra_pipeline(drift_event, history_df))
+        if result is None:
             return None
-        loop_b = _map_loop_b(audit_log, drift_event)
+        audit_log = result["audit_log"]
+        model_status = result["model_status"]
+        loop_b = _map_loop_b(audit_log, drift_event, model_status)
         loop_b["transaction_series_source"] = "synthetic_demo_data"
         loop_b["transaction_series_note"] = (
             "Planted single-day volume spike for demo purposes - not a real "
@@ -743,7 +748,32 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         expand_adverse_news=expand_adverse,
     )
     _pipeline_cache[client_id] = result
-    alerts = [_map_alert(e) for e in result.get("drift_events", [])]
+    drift_events = result.get("drift_events", [])
+    alerts = [_map_alert(e) for e in drift_events]
+
+    # Layer 2 assessment models (TimeGPT, survival, graph fusion, router) only
+    # run for genuine live requests — never against replayed/offline fixture
+    # data, so replay stays clearly an offline fallback, not a live claim.
+    run_layer2 = live and not replay_file
+    for alert, event in zip(alerts, drift_events):
+        if run_layer2:
+            loop_b = _run_layer2(event)
+            if loop_b is not None:
+                alert["reasoningTrace"]["loop_b"] = loop_b
+            else:
+                alert["reasoningTrace"]["loop_b_skip_reason"] = (
+                    "Layer 2 assessment models were requested (live=true) but "
+                    "returned no result for this event (unavailable dependency "
+                    "or runtime error) — see server logs for details."
+                )
+        else:
+            alert["reasoningTrace"]["loop_b_skip_reason"] = (
+                "Replay fixture mode: Layer 2 live assessment models are not "
+                "run against replayed fixture data."
+                if replay_file
+                else "Layer 2 live assessment models only run when live=true."
+            )
+
     for a in alerts:
         db.upsert_alert(a)
     metrics = result.get("layer1_metrics", {})
