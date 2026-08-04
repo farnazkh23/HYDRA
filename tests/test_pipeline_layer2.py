@@ -134,6 +134,8 @@ class TriggerPipelineLayer2WiringTests(unittest.TestCase):
         alert = response["alerts"][0]
         self.assertEqual(alert["reasoningTrace"]["loop_b"], canned_loop_b)
         self.assertNotIn("loop_b_skip_reason", alert["reasoningTrace"])
+        self.assertEqual(alert["dataSource"], "live")
+        self.assertEqual(response["data_source"], "live")
 
     def test_replay_run_skips_layer2_with_honest_reason(self) -> None:
         with patch.object(api, "run_layer1_pipeline", return_value=self._canned_layer1_result("person_elon_musk")), \
@@ -149,6 +151,8 @@ class TriggerPipelineLayer2WiringTests(unittest.TestCase):
         alert = response["alerts"][0]
         self.assertIsNone(alert["reasoningTrace"]["loop_b"])
         self.assertIn("Replay fixture mode", alert["reasoningTrace"]["loop_b_skip_reason"])
+        self.assertEqual(alert["dataSource"], "replay_fixture")
+        self.assertEqual(response["data_source"], "replay_fixture")
 
     def test_non_live_run_skips_layer2_with_honest_reason(self) -> None:
         with patch.object(api, "run_layer1_pipeline", return_value=self._canned_layer1_result("person_elon_musk")), \
@@ -160,6 +164,8 @@ class TriggerPipelineLayer2WiringTests(unittest.TestCase):
         alert = response["alerts"][0]
         self.assertIsNone(alert["reasoningTrace"]["loop_b"])
         self.assertIn("only run when live=true", alert["reasoningTrace"]["loop_b_skip_reason"])
+        self.assertEqual(alert["dataSource"], "mock")
+        self.assertEqual(response["data_source"], "mock")
 
 
 if __name__ == "__main__":

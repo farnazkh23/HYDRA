@@ -481,8 +481,20 @@ def get_kyc_drift(customer_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @app.get("/api/alerts")
-def get_alerts() -> list[dict[str, Any]]:
-    return db.get_all_alerts()
+def get_alerts(data_source: str | None = None) -> list[dict[str, Any]]:
+    """
+    All persisted alerts, each tagged with dataSource ("live" | "replay_fixture"
+    | "mock") reflecting how it was produced. Pass ?data_source=live to see
+    only genuine live-run alerts — stale replay/mock alerts already in
+    storage never masquerade as live results just because a later live=true
+    run happened. Alerts persisted before this tagging existed have no
+    dataSource field and are excluded by any data_source filter rather than
+    being guessed at.
+    """
+    alerts = db.get_all_alerts()
+    if data_source is None:
+        return alerts
+    return [a for a in alerts if a.get("dataSource") == data_source]
 
 
 @app.get("/api/alerts/{alert_id}")
@@ -751,6 +763,13 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     drift_events = result.get("drift_events", [])
     alerts = [_map_alert(e) for e in drift_events]
 
+    # Every alert is tagged with exactly how it was produced, so stale
+    # replay/mock alerts already in storage can never be mistaken for the
+    # result of a later live=true run when read back via GET /api/alerts.
+    data_source = "replay_fixture" if replay_file else "live" if live else "mock"
+    for alert in alerts:
+        alert["dataSource"] = data_source
+
     # Layer 2 assessment models (TimeGPT, survival, graph fusion, router) only
     # run for genuine live requests — never against replayed/offline fixture
     # data, so replay stays clearly an offline fallback, not a live claim.
@@ -798,12 +817,17 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
     return {
         "status": "ok",
         "client_id": client_id,
+        "data_source": data_source,
         "signals_collected": metrics.get("signals_processed", 0),
         "signals_dropped": metrics.get("signals_dropped", 0),
         "drift_events": metrics.get("events_emitted", 0),
         "alerts": alerts,
         "alerts_available": len(alerts),
         "replay_fixture_used": replay_file is not None,
+        # Where live news collection was actually attempted, whether it was
+        # enabled/configured, and how many queries went out — never the API
+        # key value itself. See main._load_or_collect_signals.
+        "news_collector": metrics.get("news_collector", {}),
         "note": note,
     }
 

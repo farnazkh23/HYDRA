@@ -161,7 +161,7 @@ def run_layer1_pipeline(
 ) -> dict[str, Any]:
     baselines = load_layer1_baselines()
     baseline = baselines[client_id]
-    signals, news_queries = _load_or_collect_signals(
+    signals, news_queries, news_collector_status = _load_or_collect_signals(
         baseline=baseline,
         limit=limit,
         live=live,
@@ -261,6 +261,7 @@ def run_layer1_pipeline(
             live=live,
             replay_file=replay_file,
             news_queries=news_queries,
+            news_collector_status=news_collector_status,
         ),
     }
 
@@ -306,17 +307,25 @@ def _load_or_collect_signals(
     live: bool,
     replay_file: str | None,
     expand_adverse_news: bool,
-) -> tuple[list[RawSignal], int]:
+) -> tuple[list[RawSignal], int, dict[str, Any]]:
     if replay_file:
-        return load_raw_signals(replay_file, client_id=baseline.client_id)[:limit], 0
+        signals = load_raw_signals(replay_file, client_id=baseline.client_id)[:limit]
+        return signals, 0, {
+            "path": "replay_fixture",
+            "enabled": False,
+            "api_key_configured": False,
+            "queries_attempted": 0,
+        }
 
     news_collector = EventRegistryNewsCollector(
         enabled=live,
         expand_adverse_queries=expand_adverse_news,
     )
-    signals: list[RawSignal] = []
+    signals = []
     query_count = 0
+    queries_attempted = 0
     for query_term in _build_news_query_terms(baseline):
+        queries_attempted += 1
         signals.extend(
             news_collector.fetch_company_news(
                 client_id=baseline.client_id,
@@ -326,7 +335,17 @@ def _load_or_collect_signals(
         )
         query_count += news_collector.last_query_count
     signals = _dedupe_signals_by_identity(signals)[:limit]
-    return signals, query_count if live else 0
+    news_queries = query_count if live else 0
+    news_collector_status = {
+        "path": "event_registry_live_api" if live else "disabled_mock_mode",
+        "enabled": news_collector.enabled,
+        # Presence only - the key value itself is never read or logged.
+        "api_key_configured": news_collector.api_key is not None,
+        # Every term in the loop above triggers a real HTTP attempt, whether
+        # or not it succeeds - this reflects attempts, not just successes.
+        "queries_attempted": queries_attempted if live else 0,
+    }
+    return signals, news_queries, news_collector_status
 
 
 def _drop_reason(baseline: Layer1KycBaseline, signal: RawSignal) -> str:
@@ -371,6 +390,7 @@ def _build_layer1_metrics(
     live: bool,
     replay_file: str | None,
     news_queries: int,
+    news_collector_status: dict[str, Any],
 ) -> dict[str, Any]:
     processed = len(signals)
     emitted = len(events)
@@ -387,6 +407,7 @@ def _build_layer1_metrics(
         "drop_rate": round(dropped / processed, 4) if processed else 0.0,
         "emission_rate": round(emitted / processed, 4) if processed else 0.0,
         "news_queries": news_queries,
+        "news_collector": news_collector_status,
         "llm_tokens": 0,
         "heavy_reasoner_calls": 0,
         "estimated_cost_units": estimated_cost_units,
