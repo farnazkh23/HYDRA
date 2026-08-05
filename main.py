@@ -230,6 +230,7 @@ def run_layer1_pipeline(
                     "drop_category": drop_diagnostics["drop_category"],
                     "relevance_score": drop_diagnostics["relevance_score"],
                     "matched_risk_terms": drop_diagnostics["matched_risk_terms"],
+                    "matched_entities": drop_diagnostics["matched_entities"],
                     "heuristic_score": drop_diagnostics["heuristic_score"],
                     "reconstruction_error": drop_diagnostics["reconstruction_error"],
                     "drift_threshold": drop_diagnostics["drift_threshold"],

@@ -38,6 +38,17 @@ class KeywordDriftEngine:
         if not relevance.relevant:
             return None
 
+        # Relevance only confirms the entity appears somewhere in the
+        # content/title/related_entities blob, which a passing mention deep
+        # in an article can satisfy. Require the monitored entity to show up
+        # in the title specifically, so every alert's evidence is something a
+        # reader can immediately see is about the monitored profile, not a
+        # query-only or buried-in-body match.
+        title_text = str(signal.metadata.get("title", "")).lower()
+        title_matched_entities = _monitored_entities_in_text(baseline, title_text)
+        if not title_matched_entities:
+            return None
+
         text = signal.content.lower()
         sparse_features = self.sparse_vectorizer.encode(baseline, signal)
         dense_features = self.dense_vectorizer.encode(baseline, signal)
@@ -122,6 +133,14 @@ class KeywordDriftEngine:
                     "provider": str(signal.metadata.get("provider") or ""),
                     "query": str(signal.metadata.get("query") or ""),
                     "matched_risk_terms": matched_risk_terms,
+                    # Monitored entities confirmed in the article title itself
+                    # (not just somewhere in the body) - the evidence that
+                    # this citation is genuinely linked to the monitored
+                    # profile, not a weak/incidental mention.
+                    "matched_entities": title_matched_entities,
+                    "entity_link_reason": (
+                        f"Monitored entity confirmed in article title: {', '.join(title_matched_entities)}."
+                    ),
                     "reason": rationale,
                 }
             ],
@@ -244,6 +263,23 @@ class KeywordDriftEngine:
                 "drop_category": "irrelevant_to_monitored_client",
                 "relevance_score": relevance.score,
                 "matched_risk_terms": [],
+                "matched_entities": [],
+                "heuristic_score": None,
+                "reconstruction_error": None,
+                "drift_threshold": None,
+            }
+
+        text = signal.content.lower()
+        title_text = str(signal.metadata.get("title", "")).lower()
+        title_matched_entities = _monitored_entities_in_text(baseline, title_text)
+        if not title_matched_entities:
+            return {
+                "drop_category": "weak_entity_link_title_mismatch",
+                "relevance_score": relevance.score,
+                "matched_risk_terms": [],
+                # Entities found in the body, for transparency, even though
+                # none of them were confirmed in the title.
+                "matched_entities": _monitored_entities_in_text(baseline, text),
                 "heuristic_score": None,
                 "reconstruction_error": None,
                 "drift_threshold": None,
@@ -251,7 +287,6 @@ class KeywordDriftEngine:
 
         weights = self.scoring_config.weights
         thresholds = self.scoring_config.thresholds
-        text = signal.content.lower()
         sparse_features = self.sparse_vectorizer.encode(baseline, signal)
         dense_features = self.dense_vectorizer.encode(baseline, signal)
         hybrid_features = self.hybrid_vectorizer.encode(sparse_features, dense_features)
@@ -283,23 +318,35 @@ class KeywordDriftEngine:
             "drop_category": drop_category,
             "relevance_score": relevance.score,
             "matched_risk_terms": matched_risk_terms,
+            "matched_entities": title_matched_entities,
             "heuristic_score": heuristic_score,
             "reconstruction_error": reconstruction_result.reconstruction_error,
             "drift_threshold": reconstruction_result.drift_threshold,
         }
 
 
-def _matches_monitored_entity(baseline: Layer1KycBaseline, text: str) -> bool:
+def _monitored_entities_in_text(baseline: Layer1KycBaseline, text: str) -> list[str]:
     """
-    True if any identity this baseline monitors appears in the (lowercased)
-    text - the same entity set the relevance gate (stream_engine/relevance.py)
-    already used to decide this signal was relevant, rather than only ever
-    rewarding an exact legal_name match. A signal that is relevant because it
-    mentions "Tesla" should get the same entity-match credit as one that
-    mentions "Elon Musk" for a person baseline monitoring both.
+    Which identities this baseline monitors actually appear in the
+    (lowercased) text - the same entity set the relevance gate
+    (stream_engine/relevance.py) already used to decide a signal was
+    relevant, rather than only ever recognizing an exact legal_name match.
+    Deduplicated, since legal_name commonly also appears in
+    monitored_public_entities.
     """
     candidates = [baseline.legal_name, *baseline.monitored_public_entities]
-    return any(candidate and candidate.lower() in text for candidate in candidates)
+    matched: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = candidate.lower() if candidate else ""
+        if candidate and key in text and key not in seen:
+            seen.add(key)
+            matched.append(candidate)
+    return matched
+
+
+def _matches_monitored_entity(baseline: Layer1KycBaseline, text: str) -> bool:
+    return bool(_monitored_entities_in_text(baseline, text))
 
 
 def _recommended_action(severity: DriftSeverity) -> str:

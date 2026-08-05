@@ -9,7 +9,11 @@ from backend.kyc.store import load_layer1_baselines
 from backend.models import RawSignal, SignalType
 from backend.replay import write_raw_signals
 from main import run_layer1_pipeline
-from stream_engine.drift_engine import KeywordDriftEngine, _matches_monitored_entity
+from stream_engine.drift_engine import (
+    KeywordDriftEngine,
+    _matches_monitored_entity,
+    _monitored_entities_in_text,
+)
 
 
 def _elon_musk_baseline():
@@ -29,6 +33,17 @@ class MatchesMonitoredEntityTests(unittest.TestCase):
     def test_does_not_match_unrelated_text(self) -> None:
         baseline = _elon_musk_baseline()
         self.assertFalse(_matches_monitored_entity(baseline, "unrelated corp quarterly earnings"))
+
+
+class MonitoredEntitiesInTextDedupeTests(unittest.TestCase):
+    def test_legal_name_duplicated_in_monitored_public_entities_is_not_repeated(self) -> None:
+        # person_elon_musk's legal_name ("Elon Musk") is also itself listed in
+        # monitored_public_entities - a real citation must not show
+        # "Elon Musk, Elon Musk, Tesla" as evidence.
+        baseline = _elon_musk_baseline()
+        matched = _monitored_entities_in_text(baseline, "elon musk and tesla both mentioned here")
+        self.assertEqual(matched, sorted(set(matched), key=matched.index))
+        self.assertEqual(len(matched), len(set(m.lower() for m in matched)))
 
 
 class ExplainDropTests(unittest.TestCase):
@@ -126,6 +141,81 @@ class EntityScoreBroadenedForRelevantSignalsTests(unittest.TestCase):
                 f"risk article; got diagnostics={diagnostics}"
             )
         self.assertGreater(len(event.citations), 0)
+
+
+class WeakEntityLinkTitleMismatchTests(unittest.TestCase):
+    """
+    An article that mentions the monitored entity only in the body, never in
+    the title, is weak evidence - a reader glancing at the citation title
+    would not see why it's linked to the monitored profile. Such signals
+    must be dropped with a clear category, not turned into an alert.
+    """
+
+    def setUp(self) -> None:
+        self.baseline = _elon_musk_baseline()
+        self.engine = KeywordDriftEngine()
+
+    def _content_only_signal(self) -> RawSignal:
+        return RawSignal(
+            entity_name="Tesla",
+            client_id="person_elon_musk",
+            signal_type=SignalType.NEWS,
+            source="unit_test",
+            content=(
+                "Industry roundup: several automakers faced scrutiny this week. "
+                "Tesla was named in passing amid a broader governance investigation "
+                "and lawsuit affecting the sector."
+            ),
+            timestamp=datetime.now(timezone.utc),
+            metadata={
+                "title": "Automaker industry roundup: governance investigations widen",
+                "provider": "unit_test_wire",
+                "query": "Elon Musk investigation",
+                "url": "https://example.com/roundup",
+            },
+        )
+
+    def test_content_only_mention_is_dropped_not_alerted(self) -> None:
+        signal = self._content_only_signal()
+        event = self.engine.score_signal(self.baseline, signal)
+        self.assertIsNone(event)
+
+    def test_content_only_mention_reports_weak_entity_link_category(self) -> None:
+        signal = self._content_only_signal()
+        diagnostics = self.engine.explain_drop(self.baseline, signal)
+        self.assertEqual(diagnostics["drop_category"], "weak_entity_link_title_mismatch")
+        # Confirmed present in the body, for transparency, even though it
+        # didn't clear the (stricter) title bar.
+        self.assertIn("Tesla", diagnostics["matched_entities"])
+        self.assertIsNone(diagnostics["heuristic_score"])
+
+    def test_title_confirmed_entity_still_emits_with_citation_evidence(self) -> None:
+        signal = RawSignal(
+            entity_name="Tesla",
+            client_id="person_elon_musk",
+            signal_type=SignalType.NEWS,
+            source="unit_test",
+            content=(
+                "Tesla faces a governance investigation after a lawsuit alleged "
+                "offshore financing irregularities tied to the company."
+            ),
+            timestamp=datetime.now(timezone.utc),
+            metadata={
+                "title": "Tesla governance investigation widens",
+                "provider": "unit_test_wire",
+                "query": "Tesla investigation",
+                "url": "https://example.com/tesla-investigation",
+            },
+        )
+
+        event = self.engine.score_signal(self.baseline, signal)
+
+        self.assertIsNotNone(event)
+        citation = event.citations[0]
+        self.assertIn("Tesla", citation["matched_entities"])
+        self.assertIn("Tesla", citation["entity_link_reason"])
+        self.assertEqual(citation["provider"], "unit_test_wire")
+        self.assertEqual(citation["url"], "https://example.com/tesla-investigation")
 
 
 class DroppedSignalDiagnosticsSurfaceInPipelineTests(unittest.TestCase):
