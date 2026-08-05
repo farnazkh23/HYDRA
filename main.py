@@ -197,6 +197,7 @@ def run_layer1_pipeline(
             )
         else:
             drop_reason = _drop_reason(baseline, signal)
+            drop_diagnostics = drift_engine.explain_drop(baseline, signal)
             snapshot_saved = False
             if drop_reason == "stable_below_drift_threshold":
                 snapshot_saved = append_nominal_snapshot(
@@ -222,7 +223,16 @@ def run_layer1_pipeline(
                     else str(signal.signal_type),
                     "source": signal.source,
                     "title": str(signal.metadata.get("title", signal.content.splitlines()[0])),
+                    "provider": str(signal.metadata.get("provider", "")),
+                    "query": str(signal.metadata.get("query", "")),
+                    "url": str(signal.metadata.get("url", "")),
                     "drop_reason": drop_reason,
+                    "drop_category": drop_diagnostics["drop_category"],
+                    "relevance_score": drop_diagnostics["relevance_score"],
+                    "matched_risk_terms": drop_diagnostics["matched_risk_terms"],
+                    "heuristic_score": drop_diagnostics["heuristic_score"],
+                    "reconstruction_error": drop_diagnostics["reconstruction_error"],
+                    "drift_threshold": drop_diagnostics["drift_threshold"],
                     "vae_snapshot_saved": snapshot_saved,
                     "timestamp": signal.timestamp.isoformat(),
                 }

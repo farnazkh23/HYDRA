@@ -108,12 +108,34 @@ class TriggerPipelineLayer2WiringTests(unittest.TestCase):
     def _canned_layer1_result(self, client_id: str) -> dict:
         return {
             "drift_events": [_sample_drift_event(client_id)],
+            "dropped_signals": [
+                {
+                    "title": "Unrelated Corp earnings",
+                    "provider": "unit_test_wire",
+                    "query": "Unrelated Corp",
+                    "url": "https://example.com/unrelated",
+                    "drop_reason": "irrelevant_to_monitored_client",
+                    "drop_category": "irrelevant_to_monitored_client",
+                }
+            ],
             "layer1_metrics": {
-                "signals_processed": 1,
-                "signals_dropped": 0,
+                "signals_processed": 2,
+                "signals_dropped": 1,
                 "events_emitted": 1,
             },
         }
+
+    def test_dropped_signals_are_returned_in_response(self) -> None:
+        with patch.object(api, "run_layer1_pipeline", return_value=self._canned_layer1_result("person_elon_musk")), \
+             patch.object(api.db, "upsert_alert"), \
+             patch.object(api, "_run_layer2", return_value=None):
+            response = api.trigger_pipeline({"client_id": "person_elon_musk", "live": True})
+
+        self.assertEqual(len(response["dropped_signals"]), 1)
+        dropped = response["dropped_signals"][0]
+        self.assertEqual(dropped["provider"], "unit_test_wire")
+        self.assertEqual(dropped["url"], "https://example.com/unrelated")
+        self.assertEqual(dropped["drop_category"], "irrelevant_to_monitored_client")
 
     def test_live_non_replay_run_attaches_model_status_to_loop_b(self) -> None:
         canned_loop_b = {

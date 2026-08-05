@@ -824,6 +824,10 @@ def trigger_pipeline(body: dict[str, Any] = Body(default={})) -> dict[str, Any]:
         "alerts": alerts,
         "alerts_available": len(alerts),
         "replay_fixture_used": replay_file is not None,
+        # Per-signal reasons collected signals did NOT become alerts: category,
+        # scores, and non-secret metadata (title/provider/query/url) — never
+        # silently discarded, so a zero-alert live run is diagnosable.
+        "dropped_signals": result.get("dropped_signals", []),
         # Where live news collection was actually attempted, whether it was
         # enabled/configured, and how many queries went out — never the API
         # key value itself. See main._load_or_collect_signals.

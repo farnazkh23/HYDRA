@@ -50,7 +50,7 @@ class KeywordDriftEngine:
             weights.baseline_mismatch_cap,
             weights.baseline_mismatch * len(missing_baseline_terms),
         )
-        entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
+        entity_score = weights.entity_match if _matches_monitored_entity(baseline, text) else 0.0
         sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
         adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
         source_quality = score_source_quality(signal)
@@ -214,7 +214,7 @@ class KeywordDriftEngine:
             weights.baseline_mismatch_cap,
             weights.baseline_mismatch * len(sparse_features.missing_baseline_terms),
         )
-        entity_score = weights.entity_match if baseline.legal_name.lower() in text else 0.0
+        entity_score = weights.entity_match if _matches_monitored_entity(baseline, text) else 0.0
         sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
         adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
         heuristic_score = round(
@@ -230,6 +230,76 @@ class KeywordDriftEngine:
             hybrid_features=hybrid_features,
             heuristic_score=heuristic_score,
         )
+
+    def explain_drop(self, baseline: Layer1KycBaseline, signal: RawSignal) -> dict:
+        """
+        Side-effect-free diagnostic breakdown of why a signal did not produce
+        a DriftEvent, mirroring score_signal's own gating math. Exposes only
+        non-secret scoring detail (categories, scores, matched terms) so the
+        API can honestly report drop reasons instead of a silent count.
+        """
+        relevance = evaluate_relevance(baseline, signal)
+        if not relevance.relevant:
+            return {
+                "drop_category": "irrelevant_to_monitored_client",
+                "relevance_score": relevance.score,
+                "matched_risk_terms": [],
+                "heuristic_score": None,
+                "reconstruction_error": None,
+                "drift_threshold": None,
+            }
+
+        weights = self.scoring_config.weights
+        thresholds = self.scoring_config.thresholds
+        text = signal.content.lower()
+        sparse_features = self.sparse_vectorizer.encode(baseline, signal)
+        dense_features = self.dense_vectorizer.encode(baseline, signal)
+        hybrid_features = self.hybrid_vectorizer.encode(sparse_features, dense_features)
+        matched_risk_terms = sparse_features.matched_risk_terms
+        missing_baseline_terms = sparse_features.missing_baseline_terms
+
+        risk_term_score = min(weights.risk_term_cap, weights.risk_term * len(matched_risk_terms))
+        baseline_mismatch_score = min(
+            weights.baseline_mismatch_cap,
+            weights.baseline_mismatch * len(missing_baseline_terms),
+        )
+        entity_score = weights.entity_match if _matches_monitored_entity(baseline, text) else 0.0
+        sentiment_value = _safe_float(signal.metadata.get("sentiment_score"))
+        adverse_sentiment_score = _adverse_sentiment_score(sentiment_value, self.scoring_config)
+        heuristic_score = round(
+            min(1.0, risk_term_score + baseline_mismatch_score + entity_score + adverse_sentiment_score),
+            3,
+        )
+        reconstruction_result = self.reconstruction_engine.evaluate(
+            baseline=baseline,
+            sparse_features=sparse_features,
+            dense_features=dense_features,
+            hybrid_features=hybrid_features,
+            heuristic_score=heuristic_score,
+            threshold_floor=thresholds.emit_event,
+        )
+        drop_category = "no_risk_terms_matched" if not matched_risk_terms else "below_drift_threshold"
+        return {
+            "drop_category": drop_category,
+            "relevance_score": relevance.score,
+            "matched_risk_terms": matched_risk_terms,
+            "heuristic_score": heuristic_score,
+            "reconstruction_error": reconstruction_result.reconstruction_error,
+            "drift_threshold": reconstruction_result.drift_threshold,
+        }
+
+
+def _matches_monitored_entity(baseline: Layer1KycBaseline, text: str) -> bool:
+    """
+    True if any identity this baseline monitors appears in the (lowercased)
+    text - the same entity set the relevance gate (stream_engine/relevance.py)
+    already used to decide this signal was relevant, rather than only ever
+    rewarding an exact legal_name match. A signal that is relevant because it
+    mentions "Tesla" should get the same entity-match credit as one that
+    mentions "Elon Musk" for a person baseline monitoring both.
+    """
+    candidates = [baseline.legal_name, *baseline.monitored_public_entities]
+    return any(candidate and candidate.lower() in text for candidate in candidates)
 
 
 def _recommended_action(severity: DriftSeverity) -> str:
